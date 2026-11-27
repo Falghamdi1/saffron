@@ -16,7 +16,7 @@ Run on 2026-11-27, Python 3.11.9, PostgreSQL via pgserver.
 | Cross-user isolation scenarios | 2/2 (100.0%) |
 | Recommendation quality scenarios (expected results) | 4/4 (100.0%) |
 
-The scenarios and the sweep run with the deterministic rule extractor, so they measure memory, filtering, ranking and access control, not language understanding. The scenarios were written by the same author as the code; they are regression evidence, not an independent benchmark.
+The table above and the sweep use the deterministic rule extractor, so they measure memory, filtering, ranking and access control, not language understanding. The scenarios were written by the same author as the code; they are regression evidence, not an independent benchmark.
 
 ## Language understanding on unseen phrasings
 
@@ -27,8 +27,7 @@ The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It expo
 | Extractor | Exact match | Precision | Recall | Allergy statements caught |
 | --- | --- | --- | --- | --- |
 | Rules only | 13/30 | 88% | 29% | 3/5 |
-
-Gemini has not been scored in this run (`--llm` with an API key).
+| Gemini (gemini-3.5-flash-lite) + rules | 26/30 | 85% | 96% | 5/5 |
 
 Messages Rules only got wrong:
 
@@ -49,6 +48,19 @@ Messages Rules only got wrong:
 - Turns out I'm fine with eggs, the allergy test was negative
 - I've gone back to eating meat
 - I used to enjoy mushrooms, not these days
+
+Messages Gemini (gemini-3.5-flash-lite) + rules got wrong:
+
+- I've started eating fish but still no meat
+- Gulf food is what I love most
+- Turns out I'm fine with eggs, the allergy test was negative
+- My colleague loves lamb, what would you suggest for them?
+
+## Scenarios with Gemini
+
+26/26 scenarios passed with gemini-3.5-flash-lite reading messages. 0 of 55 model calls failed and used rules. Hard-constraint violations: 0 of 47 recommendations.
+
+The first live run passed 23/26. It showed a hedged statement (“I don't eat much meat”) stored as a firm dislike, and “Do you have sushi?” not saying that sushi is not served; both were fixed. The third failure was a scenario that accepted only one of two correct history events, and the scenario was corrected.
 
 ## Scenarios
 

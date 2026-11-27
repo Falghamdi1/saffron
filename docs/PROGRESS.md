@@ -11,4 +11,7 @@
   ("sesame seeds"); phone header overflow.
 - Added deployment configuration and a live smoke test, run locally only.
 
-Open: Supabase, Gemini key, GitHub repository, Render service, live verification, video.
+- Verified Gemini live. Fixed: a dropped price limit, a hedged statement stored as a
+  dislike, an unknown dish not reported, and no retry on model overload.
+
+Open: Supabase database setup, GitHub repository, Render service, live verification, video.

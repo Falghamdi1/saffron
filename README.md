@@ -73,10 +73,10 @@ cd backend
 .\.venv\Scripts\python -m evaluation.run
 ```
 
-Latest measured results are in [docs/EVALUATION.md](docs/EVALUATION.md). Two points to
-read together: no hard-constraint violation was found in the constraint sweep, **and** the
-rule-based fallback understands unfamiliar phrasing poorly. The fallback is a safety net,
-not a substitute for the model.
+Add `--llm` to also score Gemini (needs a key). Latest measured results are in
+[docs/EVALUATION.md](docs/EVALUATION.md). No hard-constraint violation was found in the
+constraint sweep. On 30 unseen phrasings Gemini matched 26 exactly and the rule-based
+fallback 13, so the fallback is a safety net, not a substitute for the model.
 
 ## Layout
 

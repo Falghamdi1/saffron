@@ -6,10 +6,7 @@
 - It has not run against a real Supabase project. Row Level Security was tested on local
   PostgreSQL 16 with a shim for Supabase's `auth` schema, and token verification with a
   locally generated signing key.
-- The Gemini adapter has only been tested against mocked responses. Its request format
-  follows the documentation but has never received a live answer.
-- Evaluation scenarios have only run with the rule extractor, so they do not yet describe
-  how the app behaves when Gemini reads the messages.
+- Gemini results come from single live runs on one day. Model output varies between runs.
 
 ## Safety
 
@@ -22,6 +19,9 @@
 ## Behaviour
 
 - English only.
+- Gemini can attribute someone else's taste to the user: "My colleague loves lamb" was saved
+  as the user's own preference.
+- A live call took about six seconds, so replies feel slow.
 - The model sees one message at a time, so "yes", "that one" or "the second" are not
   understood. Confirmations use buttons.
 - Replies are templated.
