@@ -27,6 +27,7 @@ def found(message):
     ("I don't have a nut allergy", ("allergy", "nut", "retract", "persistent", "explicit")),
     ("I'm no longer vegetarian", ("diet", "vegetarian", "retract", "persistent", "explicit")),
     ("I don't eat much meat", ("diet", "vegetarian", "assert", "persistent", "uncertain")),
+    ("I think I might be vegetarian", ("diet", "vegetarian", "assert", "persistent", "uncertain")),
     ("I really love mushrooms", ("like", "mushroom", "assert", "persistent", "explicit")),
     ("My budget is 60 SAR", ("budget", "60", "assert", "persistent", "explicit")),
     ("I can't handle spicy food", ("spice", "none", "assert", "persistent", "explicit")),

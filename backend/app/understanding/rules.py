@@ -40,7 +40,10 @@ CLAUSE_BREAK = re.compile(
     r"\s+and\s+(?=i\b|i'm\b|i've\b|my\b)|,\s*(?=(?:recommend|suggest|what|can|show|give)\b)"
 )
 DIET_NAME = r"(vegetarian|vegan|pescatarian|gluten[- ]free|dairy[- ]free)"
-FIRST_PERSON = r"\b(?:i am|i'm|im|i've been|i have been|i've gone|i went|i became|we are|we're)\b"
+FIRST_PERSON = (
+    r"\b(?:i am|i'm|im|i've been|i have been|i've gone|i went|i became|"
+    r"i might be|i may be|we are|we're)\b"
+)
 
 
 def clauses(message: str) -> list[str]:

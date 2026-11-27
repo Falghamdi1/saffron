@@ -1,0 +1,219 @@
+"""Run the evaluation and write the report from measured results.
+
+    python -m evaluation.run          # deterministic, no API key needed
+    python -m evaluation.run --llm    # also score extraction with Gemini (uses quota)
+"""
+
+import argparse
+import itertools
+import json
+import platform
+import tempfile
+import time
+from collections import defaultdict
+from datetime import date
+from pathlib import Path
+
+import pgserver
+from fastapi.testclient import TestClient
+
+from app.config import ROOT_DIR, Settings
+from app.main import create_app
+from app.memory.policy import normalize
+from app.recommendation.engine import Profile, recommend
+from app.setup_db import load_menu_file, setup_database
+from app.understanding.llm import GeminiProvider
+from app.understanding.service import understand
+from app.vocabulary import ALLERGENS, DIETS
+from evaluation.harness import Limits, Tally, violations_by_oracle
+from evaluation.scenarios import SCENARIOS, Context
+
+REPORT = ROOT_DIR / "docs" / "EVALUATION.md"
+PARAPHRASES = Path(__file__).with_name("paraphrases.json")
+
+
+def run_scenarios(settings: Settings) -> tuple[list[dict], Tally]:
+    tally = Tally()
+    results = []
+    with TestClient(create_app(settings)) as client:
+        context = Context(client, settings, tally)
+        for scenario in SCENARIOS:
+            try:
+                scenario.run(context)
+                detail = ""
+            except Exception as error:  # a crash is a failed scenario, not a failed run
+                detail = f"{type(error).__name__}: {error}"[:200]
+            results.append({
+                "area": scenario.area, "title": scenario.title,
+                "passed": not detail, "detail": detail,
+            })
+    return results, tally
+
+
+def constraint_sweep() -> dict:
+    """Every allergen pair, diet and budget combination, checked by the oracle."""
+    menu = load_menu_file()
+    allergy_sets = [()] + [(a,) for a in ALLERGENS] + list(itertools.combinations(ALLERGENS, 2))
+    profiles = recommendations = violating = 0
+    for allergies, diet, budget, category in itertools.product(
+        allergy_sets, (None, *DIETS), (None, 30, 60), (None, "starter", "main", "dessert", "drink")
+    ):
+        diets = (diet,) if diet else ()
+        result = recommend(menu, Profile(
+            allergies=frozenset(allergies), diets=frozenset(diets),
+            max_price=budget, category=category,
+        ), limit=len(menu))
+        limits = Limits(allergens=allergies, diets=diets, max_price=budget)
+        profiles += 1
+        recommendations += len(result.recommendations)
+        violating += sum(
+            bool(violations_by_oracle(r.item.id, limits)) for r in result.recommendations
+        )
+    return {"profiles": profiles, "recommendations": recommendations, "violations": violating}
+
+
+def extraction_score(provider) -> dict:
+    """Preference extraction on phrasings the rules were not written against."""
+    cases = json.loads(PARAPHRASES.read_text(encoding="utf-8"))
+    true_positive = false_positive = false_negative = exact = fallbacks = 0
+    allergy_found = allergy_total = 0
+    misses = []
+    for case in cases:
+        result, engine = understand(case["message"], provider)
+        if provider is not None:
+            fallbacks += engine == "fallback"
+            time.sleep(6.5)  # stay inside free-tier requests per minute
+        got = {
+            (c.category, c.value, c.operation)
+            for candidate in result.preferences if candidate.scope == "persistent"
+            for c in normalize(candidate)
+        }
+        want = {tuple(e) for e in case["expected"]}
+        true_positive += len(got & want)
+        false_positive += len(got - want)
+        false_negative += len(want - got)
+        exact += got == want
+        for item in want:
+            if item[0] == "allergy" and item[2] == "assert":
+                allergy_total += 1
+                allergy_found += item in got
+        if got != want:
+            misses.append(case["message"])
+    return {
+        "cases": len(cases),
+        "exact": exact,
+        "precision": true_positive / max(true_positive + false_positive, 1),
+        "recall": true_positive / max(true_positive + false_negative, 1),
+        "allergy_found": allergy_found,
+        "allergy_total": allergy_total,
+        "fallbacks": fallbacks,
+        "misses": misses,
+    }
+
+
+def percent(part: float, whole: float) -> str:
+    return f"{100 * part / whole:.1f}%" if whole else "n/a"
+
+
+def render(results: list[dict], tally: Tally, sweep: dict, extraction: dict[str, dict]) -> str:
+    by_area: dict[str, list[dict]] = defaultdict(list)
+    for result in results:
+        by_area[result["area"]].append(result)
+
+    def area(name: str) -> str:
+        rows = by_area[name]
+        passed = sum(r["passed"] for r in rows)
+        return f"{passed}/{len(rows)} ({percent(passed, len(rows))})"
+
+    passed = sum(r["passed"] for r in results)
+    lines = [
+        "# Evaluation report",
+        "",
+        "Generated by `python -m evaluation.run`. Do not edit by hand.",
+        "",
+        f"Run on {date.today().isoformat()}, Python {platform.python_version()}, "
+        "PostgreSQL via pgserver.",
+        "",
+        "## Summary",
+        "",
+        "| Measure | Result |",
+        "| --- | --- |",
+        f"| End-to-end scenarios passed | {passed}/{len(results)} |",
+        f"| Hard-constraint violations, constraint sweep | {sweep['violations']} of "
+        f"{sweep['recommendations']:,} recommendations over {sweep['profiles']:,} profiles |",
+        f"| Hard-constraint violations, scenarios | {len(tally.violations)} of "
+        f"{tally.recommendations} recommendations |",
+        f"| Memory retrieval scenarios | {area('memory')} |",
+        f"| Preference update scenarios | {area('updates')} |",
+        f"| Cross-user isolation scenarios | {area('isolation')} |",
+        f"| Recommendation quality scenarios (expected results) | {area('quality')} |",
+        "",
+        "The scenarios and the sweep run with the deterministic rule extractor, so they "
+        "measure memory, filtering, ranking and access control, not language understanding. "
+        "The scenarios were written by the same author as the code; they are regression "
+        "evidence, not an independent benchmark.",
+        "",
+        "## Language understanding on unseen phrasings",
+        "",
+        "`evaluation/paraphrases.json` holds messages written without consulting the "
+        "extraction patterns. The patterns were not changed to improve this score.",
+        "",
+        "| Extractor | Exact match | Precision | Recall | Allergy statements caught |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for name, score in extraction.items():
+        lines.append(
+            f"| {name} | {score['exact']}/{score['cases']} | {score['precision']:.0%} | "
+            f"{score['recall']:.0%} | {score['allergy_found']}/{score['allergy_total']} |"
+        )
+        if score["fallbacks"]:
+            lines.append(
+                f"\n{score['fallbacks']} of {score['cases']} model calls failed and used rules."
+            )
+    if not any(name.startswith("Gemini") for name in extraction):
+        lines += ["", "Gemini has not been scored in this run (`--llm` with an API key)."]
+    for name, score in extraction.items():
+        if score["misses"]:
+            lines += ["", f"Messages {name} got wrong:", ""]
+            lines += [f"- {message}" for message in score["misses"]]
+
+    lines += ["", "## Scenarios", "", "| Area | Scenario | Result |", "| --- | --- | --- |"]
+    for result in results:
+        outcome = "Pass" if result["passed"] else f"**Fail**: {result['detail']}"
+        lines.append(f"| {result['area']} | {result['title']} | {outcome} |")
+    return "\n".join(lines) + "\n"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--llm", action="store_true", help="also score Gemini extraction")
+    args = parser.parse_args()
+
+    extraction = {"Rules only": extraction_score(None)}
+    if args.llm:
+        configured = Settings()
+        if not configured.gemini_api_key:
+            parser.error("--llm needs GEMINI_API_KEY")
+        provider = GeminiProvider(configured.gemini_api_key, configured.gemini_model)
+        extraction[f"Gemini ({configured.gemini_model}) + rules"] = extraction_score(provider)
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
+        server = pgserver.get_server(directory, cleanup_mode="stop")
+        try:
+            setup_database(server.get_uri(), local=True)
+            settings = Settings(
+                _env_file=None, auth_mode="local", database_url=server.get_uri(),
+                gemini_api_key="", chat_rate_limit_per_minute=1000,
+            )
+            results, tally = run_scenarios(settings)
+        finally:
+            server.cleanup()
+
+    report = render(results, tally, constraint_sweep(), extraction)
+    REPORT.parent.mkdir(exist_ok=True)
+    REPORT.write_text(report, encoding="utf-8", newline="\n")
+    print(report)
+
+
+if __name__ == "__main__":
+    main()

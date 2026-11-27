@@ -1,6 +1,7 @@
 """HTTP routes. Each user route derives identity from the verified access token."""
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
@@ -14,6 +15,7 @@ from app.memory import service as memory_service
 from app.menu import load_menu
 from app.recommendation.engine import build_profile, violations
 from app.schemas import Candidate, RequestConstraints
+from app.vocabulary import ALLERGENS
 
 router = APIRouter(prefix="/api")
 
@@ -33,6 +35,10 @@ class ChatRequest(BaseModel):
 
 class LocalSignIn(BaseModel):
     name: str = Field(min_length=1, max_length=40, pattern=r"^[\w .@-]+$")
+
+
+class AllergyEntry(BaseModel):
+    allergen: Literal[ALLERGENS]
 
 
 def database(request: Request) -> Database:
@@ -158,6 +164,21 @@ def _memory_view(db: Database, user_id: str) -> dict:
 
 @router.get("/memory")
 def memory(user: User = Depends(signed_in), db: Database = Depends(database)) -> dict:
+    return _memory_view(db, user.id)
+
+
+@router.post("/memory/allergies")
+def add_allergy(
+    body: AllergyEntry,
+    user: User = Depends(signed_in), db: Database = Depends(database),
+) -> dict:
+    """Record an allergy directly, without relying on message understanding."""
+    with db.user_session(user.id) as connection:
+        memory_service.remember(
+            connection, user.id,
+            [Candidate(category="allergy", value=body.allergen)],
+            "Added in the preferences panel",
+        )
     return _memory_view(db, user.id)
 
 

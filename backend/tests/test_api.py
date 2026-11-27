@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from app.understanding.llm import LLMError
-from tests.conftest import Diner, picks
+from evaluation.harness import Diner, picks
 
 USER_TABLES = ("profiles", "conversations", "messages", "preferences", "memory_events")
 
@@ -166,6 +166,18 @@ def test_conversations_can_be_reopened(diner):
     messages = diner.get(f"/api/conversations/{diner.conversation_id}/messages").json()
     assert [m["role"] for m in messages] == ["user", "assistant"]
     assert messages[1]["payload"]["recommendations"]
+
+
+def test_allergy_can_be_recorded_without_language_understanding(diner):
+    response = diner.client.post(
+        "/api/memory/allergies", json={"allergen": "tree_nut"}, headers=diner.headers
+    )
+    assert response.status_code == 200
+    assert diner.preferences() == {("allergy", "tree_nut")}
+    invalid = diner.client.post(
+        "/api/memory/allergies", json={"allergen": "kryptonite"}, headers=diner.headers
+    )
+    assert invalid.status_code == 422
 
 
 def test_users_cannot_see_or_change_each_others_data(client):

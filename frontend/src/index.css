@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Figtree", system-ui, sans-serif;
+  --color-paper: #f6f4ee;
+  --color-card: #fffefb;
+  --color-line: #ded9cc;
+  --color-ink: #1d2421;
+  --color-muted: #5f6a65;
+  --color-pine: #123c34;
+  --color-saffron: #f2a93b;
+  --color-ember: #a9480f;
+  --color-alert: #9b2c1f;
+  --color-alert-soft: #fbeae6;
+  --color-herb: #3f6b3a;
+  --color-herb-soft: #eaf1e4;
+}
+
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+}
+
+button {
+  @apply cursor-pointer disabled:cursor-not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ember);
+  outline-offset: 2px;
+}
+
+.btn {
+  @apply rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-pine text-paper hover:bg-pine/90;
+}
+
+.btn-quiet {
+  @apply border border-line bg-card text-ink hover:border-pine;
+}
+
+.field {
+  @apply border-line bg-card w-full rounded-xl border px-3 py-2.5 text-base;
+}
+
+.eyebrow {
+  @apply text-muted text-xs font-semibold tracking-wider uppercase;
+}
