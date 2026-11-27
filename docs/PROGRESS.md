@@ -17,4 +17,8 @@
 - Set up the Supabase project and loaded the schema. The live smoke test passed with the
   app running locally: sign-in, remembered allergy, Gemini in use, isolation of two accounts.
 
-Open: GitHub repository, Render service, verification of the deployment, video.
+- Pushed to GitHub. The first CI run showed that local mode rejected the Unix-socket
+  database used on Linux and macOS; fixed, and the host check now also covers `?host=`
+  overrides. Backend, frontend and image jobs then passed.
+
+Open: Render service, verification of the deployment, video.

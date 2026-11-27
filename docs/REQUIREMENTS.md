@@ -9,7 +9,7 @@ key or recording.
 
 | Requirement | Component | Evidence | Status |
 | --- | --- | --- | --- |
-| 2.1 Natural preference discovery, no questionnaire | `app/understanding/` | `tests/test_understanding.py` | Done; live Gemini path pending a key |
+| 2.1 Natural preference discovery, no questionnaire | `app/understanding/` | `tests/test_understanding.py` | Done |
 | 2.2 Recommendations from preferences, restrictions and request | `app/recommendation/engine.py` | `tests/test_recommendation.py`, quality scenarios | Done |
 | 2.2 No invented dishes, prices or ingredients | `app/chat/reply.py` composes from records | scenario `nonexistent_dish` | Done |
 | 2.3 Persistent memory across conversations | `app/memory/` | scenarios `persistence_across_sessions`, `persistence_across_restart` | Done |
@@ -42,7 +42,7 @@ key or recording.
 | Deliverable | Status |
 | --- | --- |
 | 6.1 Deployed application URL and test instructions | **Pending**: [DEPLOYMENT.md](DEPLOYMENT.md) |
-| 6.2 Repository with README, architecture, decisions, setup, limitations; no secrets | Done locally; **pending push** |
+| 6.2 Repository with README, architecture, decisions, setup, limitations; no secrets | Done |
 | 6.3 Video, 8–12 minutes | **Pending**: [VIDEO_WALKTHROUGH.md](VIDEO_WALKTHROUGH.md) |
 | 6.4 Google Drive folder with URL, repository, video and access notes | **Pending** |
 

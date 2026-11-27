@@ -2,7 +2,7 @@
 
 ## Not yet verified
 
-- The application has not been deployed. The Docker image has not been built.
+- The application has not been deployed. CI builds the Docker image but does not run it.
 - The live smoke test passed against a real Supabase project with the app running locally,
   not on a host. The automated tests use local PostgreSQL 16 with a shim for Supabase's
   `auth` schema and a locally generated signing key.
