@@ -317,3 +317,11 @@ def test_unknown_dish_is_reported_when_the_model_also_calls_it_a_food(settings):
         assert "isn't on our menu" in reply["content"]
         assert "couldn't find" not in reply["content"]
         assert picks(reply)
+
+
+def test_pasted_environment_values_are_trimmed(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@127.0.0.1/x?sslmode=require\n")
+    monkeypatch.setenv("GEMINI_API_KEY", "  not-a-real-key\n")
+    settings = Settings(_env_file=None, auth_mode="local")
+    assert settings.database_url.endswith("sslmode=require")
+    assert settings.gemini_api_key == "not-a-real-key"

@@ -34,8 +34,10 @@ def is_local_database(url: str) -> bool:
 
 class Settings(BaseSettings):
     # Validation errors must never echo configuration values, which include secrets.
+    # Values pasted into a hosting dashboard often carry a trailing newline.
     model_config = SettingsConfigDict(
-        env_file=ROOT_DIR / ".env", extra="ignore", hide_input_in_errors=True
+        env_file=ROOT_DIR / ".env", extra="ignore", hide_input_in_errors=True,
+        str_strip_whitespace=True,
     )
 
     auth_mode: Literal["supabase", "local"] = "local"
