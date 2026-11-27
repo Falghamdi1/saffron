@@ -11,17 +11,19 @@ databases, with the same Gemini model as production.
 ## Status after remediation
 
 Updated after Phase 1 of [remediation_plan.md](remediation_plan.md). The sections below
-describe the audited commit and are left as written. **The fixes are not yet deployed:** the
-live site still runs the audited behaviour until they are pushed.
+describe the audited commit and are left as written. The fixes were deployed as commit
+`6c66bb1`, and the two-account live check, run by the project owner, passed against the
+deployment. That check covers C1 (enforced in the chat, not saved), memory across
+conversations and isolation; the other fixes were verified locally, not on the live site.
 
 | Finding | State | How it was checked |
 | --- | --- | --- |
-| C1 other diners' allergies | Fixed locally | Audit probes re-run with Gemini and rules: no unsafe dish, notice shown, nothing saved |
-| H1 third-person saved as the user's own | Fixed locally for the patterns covered | Same probes; unit tests with mocked wrong model output; gaps listed in LIMITATIONS.md |
-| H2 spice limit lost | Fixed locally | The audit message re-run with Gemini saved a mild spice level; tests |
-| H3 "too spicy" read as hot | Fixed locally | Tests and rules-only probe |
-| M1 stale requests | Fixed locally | Test with a scripted model; probe with Gemini |
-| M2 generic nouns | Fixed locally | Tests; "best lamb dish" with Gemini now returns lamb dishes |
+| C1 other diners' allergies | Fixed, verified live | Audit probes re-run with Gemini and rules: no unsafe dish, notice shown, nothing saved; live check |
+| H1 third-person saved as the user's own | Fixed for the patterns covered; deployed | Same probes; unit tests with mocked wrong model output; gaps listed in LIMITATIONS.md |
+| H2 spice limit lost | Fixed, deployed | The audit message re-run with Gemini saved a mild spice level; tests |
+| H3 "too spicy" read as hot | Fixed, deployed | Tests and rules-only probe |
+| M1 stale requests | Fixed, deployed | Test with a scripted model; probe with Gemini |
+| M2 generic nouns | Fixed, deployed | Tests; "best lamb dish" with Gemini now returns lamb dishes |
 | H4 Gemini quota | Open | Needs an owner decision |
 | M3 keep-alive | Open | Owner must set `APP_URL` |
 | M4, L2 to L6 | Open | Phase 2 and 3 |

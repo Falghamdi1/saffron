@@ -26,7 +26,7 @@
   smoke test passed against the deployment.
 
 - Audited the project (engineering_audit.md). Fixed: other diners' allergies not enforced or
-  saved as the customer's own, lost spice limits, and requests carried into later turns. The
-  fixes are not yet deployed.
+  saved as the customer's own, lost spice limits, and requests carried into later turns.
+- Deployed the fixes; the live check, now including another diner's allergy, passed.
 
-Open: deploy the fixes, manual check on a phone, keep-alive variable, video, submission.
+Open: manual check on a phone, keep-alive variable, video, submission.
