@@ -27,6 +27,9 @@ Diner A. Open **My preferences** first to show it is empty, then go to **Order**
 | `What should I have for dinner under 60 riyals?` | Cards with price, ingredients, allergens and "Why this dish"; the count of dishes left out; the safety notice |
 | `I usually like mild food.` | A lasting spice preference |
 
+Later replies in this chat repeat that the SAR 60 limit still applies. That is intended: say so
+once, or start a new conversation to drop it.
+
 ## 2:10 Today only, comparison and unknown dishes (1 min)
 
 | Type | Point out |

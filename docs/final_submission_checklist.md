@@ -13,8 +13,11 @@ to files under `backend/`.
 
 "Scenarios" means `evaluation/scenarios.py` ([evaluation.md](evaluation.md)): 30 of 30 pass
 with rules. With Gemini the last complete run passed 29 of 30, the failure being a memory
-error on the test machine; the rerun was cut short by the daily quota. The live check was last run by the project owner against
-commit `6c66bb1`; later changes are **not yet deployed**.
+error on the test machine; the rerun was cut short by the daily quota. 
+
+**Deployment state:** commit `7e648df` is the one deployed (CI and Render reported success).
+The live check was last run by the project owner on the commit before it, `6c66bb1`. Work
+after `7e648df`, including the redesigned interface, is **not yet deployed**.
 
 ## Part 1: baseline
 
@@ -29,7 +32,7 @@ commit `6c66bb1`; later changes are **not yet deployed**.
 | 2.4 Corrections and changing preferences | `app/memory/policy.py`, preferences screen | `tests/test_memory_policy.py`; update scenarios | Verified |
 | 2.5 Returning users are identified | Supabase Auth, `app/auth.py` | `tests/test_auth.py`; live check | Verified |
 | 2.5 Users' memories are isolated | Row Level Security, `app/db.py` | isolation scenarios; `tests/test_api.py`; live check | Verified |
-| 2.6 Deployed application the team can use | Render, <https://saffron-ai-zrnt.onrender.com> | live check on `6c66bb1`; sign-in page loaded in a fresh browser tab | Partially verified: the current code is not deployed |
+| 2.6 Deployed application the team can use | Render, <https://saffron-ai-zrnt.onrender.com> | live check on `6c66bb1`; sign-in page of `7e648df` loaded in a fresh browser tab with no console errors | Partially verified: the current code is not deployed |
 
 ## Menu
 
@@ -87,13 +90,16 @@ commit `6c66bb1`; later changes are **not yet deployed**.
 
 ## Before submitting
 
-1. Approve the deploy of the current code, then run the live check (10 `PASS` lines).
-2. In a private window, create a new account on the live site, state an allergy, sign out,
+1. Approve the deploy of the current code. After the model quota resets, run the live check
+   (10 `PASS` lines; before the reset, "language model is in use" fails).
+2. While signed in on the live site, open Menu or My preferences and reload: you should stay
+   signed in on that section. This was only tried in local mode.
+3. In a private window, create a new account on the live site, state an allergy, sign out,
    sign in, start a new conversation and confirm it applies. Try the sesame sentence about
    another person.
-3. Check the site on a real phone.
-4. Set the `APP_URL` repository variable and run **Keep alive** once.
-5. Record the video and upload it to the Drive folder with the URL, repository link and
+4. Check the site on a real phone.
+5. Set the `APP_URL` repository variable and run **Keep alive** once.
+6. Record the video and upload it to the Drive folder with the URL, repository link and
    access notes.
-6. Open every link from a signed-out browser.
-7. Confirm the deadline in HR's message.
+7. Open every link from a signed-out browser.
+8. Confirm the deadline in HR's message.
