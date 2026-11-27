@@ -2,7 +2,7 @@
 
 Source: the Foodics AI Engineer take-home assignment. Test files are under `backend/`.
 
-Status: **Done** is implemented and tested locally. **Pending** needs an external account,
+Status: **Done** is implemented and tested. **Pending** needs an external account,
 key or recording.
 
 ## Baseline
@@ -15,7 +15,7 @@ key or recording.
 | 2.3 Persistent memory across conversations | `app/memory/` | scenarios `persistence_across_sessions`, `persistence_across_restart` | Done |
 | 2.4 Corrections and changing preferences | `app/memory/policy.py` | `tests/test_memory_policy.py`, update scenarios | Done |
 | 2.5 Returning users, isolation | `app/auth.py`, `app/db.py`, RLS | `tests/test_auth.py`, `test_row_level_security_blocks_unfiltered_queries` | Done |
-| 2.6 Deployed, usable interface | `frontend/`, `Dockerfile`, `render.yaml` | browser walkthrough (local) | **Pending deployment** |
+| 2.6 Deployed, usable interface | `frontend/`, `Dockerfile`, `render.yaml` | browser walkthrough (local), live smoke test | Done |
 
 ## Menu
 
@@ -41,7 +41,7 @@ key or recording.
 
 | Deliverable | Status |
 | --- | --- |
-| 6.1 Deployed application URL and test instructions | **Pending**: [DEPLOYMENT.md](DEPLOYMENT.md) |
+| 6.1 Deployed application URL and test instructions | Done: [README](../README.md) |
 | 6.2 Repository with README, architecture, decisions, setup, limitations; no secrets | Done |
 | 6.3 Video, 8–12 minutes | **Pending**: [VIDEO_WALKTHROUGH.md](VIDEO_WALKTHROUGH.md) |
 | 6.4 Google Drive folder with URL, repository, video and access notes | **Pending** |

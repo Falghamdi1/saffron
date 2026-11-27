@@ -2,10 +2,10 @@
 
 ## Not yet verified
 
-- The application has not been deployed. CI builds the Docker image but does not run it.
-- The live smoke test passed against a real Supabase project with the app running locally,
-  not on a host. The automated tests use local PostgreSQL 16 with a shim for Supabase's
-  `auth` schema and a locally generated signing key.
+- The deployed application passed the live smoke test; it has not been checked by hand on a
+  phone, and it has not been load tested.
+- The automated tests use local PostgreSQL 16 with a shim for Supabase's `auth` schema and a
+  locally generated signing key, not a Supabase project.
 - Gemini results come from single live runs on one day. Model output varies between runs.
 
 ## Safety

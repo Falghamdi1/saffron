@@ -21,4 +21,8 @@
   database used on Linux and macOS; fixed, and the host check now also covers `?host=`
   overrides. Backend, frontend and image jobs then passed.
 
-Open: Render service, verification of the deployment, video.
+- Deployed to Render at https://saffron-ai-zrnt.onrender.com. The first deploys failed on missing variables
+  and then on a newline pasted into `DATABASE_URL`; the app now trims such values. The live
+  smoke test passed against the deployment.
+
+Open: manual check on a phone, keep-alive variable, video, submission.

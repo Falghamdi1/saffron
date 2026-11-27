@@ -8,8 +8,12 @@ shows the diner everything it remembers and how that changed.
 
 | | |
 | --- | --- |
-| Live application | _Not deployed yet. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)._ |
+| Live application | <https://saffron-ai-zrnt.onrender.com> |
 | Video walkthrough | _To be recorded._ |
+
+To try the live application, create an account with an email and a password of at least 8
+characters; no confirmation email is sent. A second account in a private window shows that
+diners are isolated. It runs on free tiers, so the first load may take about a minute.
 
 ## The core idea
 
