@@ -26,7 +26,13 @@ def sign_in(client: httpx.Client, config: dict, suffix: str) -> dict[str, str]:
                 "password": os.environ[f"CHECK_PASSWORD_{suffix}"],
             },
         )
-    response.raise_for_status()
+    if response.is_error:
+        # Report the account and the server's reason, never the password.
+        account = os.environ.get(f"CHECK_USER_{suffix}", f"check {suffix}")
+        sys.exit(
+            f"Sign-in failed for account {suffix} ({account}): "
+            f"HTTP {response.status_code} {response.text[:200]}"
+        )
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 

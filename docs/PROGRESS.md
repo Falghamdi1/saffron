@@ -14,4 +14,7 @@
 - Verified Gemini live. Fixed: a dropped price limit, a hedged statement stored as a
   dislike, an unknown dish not reported, and no retry on model overload.
 
-Open: Supabase database setup, GitHub repository, Render service, live verification, video.
+- Set up the Supabase project and loaded the schema. The live smoke test passed with the
+  app running locally: sign-in, remembered allergy, Gemini in use, isolation of two accounts.
+
+Open: GitHub repository, Render service, verification of the deployment, video.

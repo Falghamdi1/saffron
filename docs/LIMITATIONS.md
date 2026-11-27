@@ -3,9 +3,9 @@
 ## Not yet verified
 
 - The application has not been deployed. The Docker image has not been built.
-- It has not run against a real Supabase project. Row Level Security was tested on local
-  PostgreSQL 16 with a shim for Supabase's `auth` schema, and token verification with a
-  locally generated signing key.
+- The live smoke test passed against a real Supabase project with the app running locally,
+  not on a host. The automated tests use local PostgreSQL 16 with a shim for Supabase's
+  `auth` schema and a locally generated signing key.
 - Gemini results come from single live runs on one day. Model output varies between runs.
 
 ## Safety
