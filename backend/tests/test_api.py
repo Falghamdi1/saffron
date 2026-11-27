@@ -353,3 +353,15 @@ def test_a_dish_question_does_not_shape_the_next_request(settings):
         reply = diner.say("Recommend a dessert")
         assert "couldn't find" not in reply["content"]
         assert picks(reply)
+
+
+def test_an_earlier_price_limit_is_mentioned_when_it_rules_dishes_out(diner):
+    first = diner.say("recommend a main under 45 SAR")
+    assert "earlier in this chat" not in first["content"]
+    later = diner.say("what about something spicy?")
+    assert "SAR 45 limit you gave earlier" in later["content"]
+
+
+def test_a_saved_budget_is_not_described_as_given_earlier_in_the_chat(diner):
+    diner.say("My budget is 45")
+    assert "earlier in this chat" not in diner.say("recommend a main")["content"]

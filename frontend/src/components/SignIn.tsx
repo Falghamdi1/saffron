@@ -42,25 +42,31 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
     }
   }
 
+  const action = creating ? "Create account" : local ? "Start ordering" : "Sign in";
+
   return (
-    <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
-      <section className="bg-pine text-paper flex flex-col justify-between gap-10 p-8 lg:p-14">
-        <p className="font-display text-saffron text-2xl">Saffron</p>
+    <main className="grid min-h-dvh content-start lg:grid-cols-[1.1fr_1fr] lg:content-stretch">
+      <section className="bg-pine text-paper flex flex-col justify-between gap-6 px-6 py-8 lg:p-14">
+        <p className="font-display text-saffron text-2xl font-semibold" translate="no">
+          Saffron
+        </p>
         <div className="max-w-md">
-          <h1 className="font-display text-4xl leading-tight lg:text-5xl">
+          <h1 className="font-display text-3xl leading-tight font-semibold lg:text-5xl">
             A table that remembers how you eat.
           </h1>
-          <p className="text-paper/80 mt-4">
-            Tell us once about your allergies, tastes and budget. Next time, the suggestions are
-            already yours, and you can see and correct everything we remember.
+          <p className="text-paper/85 mt-4">
+            Tell us once about your allergies, tastes and budget. Next time the suggestions already
+            fit, and you can see and correct everything we remember.
           </p>
         </div>
-        <p className="text-paper/60 text-sm">Levantine, Gulf, Indian and Mediterranean kitchen</p>
+        <p className="text-paper/75 hidden text-sm lg:block">
+          Levantine, Gulf, Indian and Mediterranean kitchen
+        </p>
       </section>
 
-      <section className="flex items-center justify-center p-6">
+      <section className="flex items-center justify-center px-6 py-8">
         <form onSubmit={submit} className="w-full max-w-sm space-y-4">
-          <h2 className="font-display text-2xl">
+          <h2 className="font-display text-2xl font-semibold">
             {local ? "Who is ordering?" : creating ? "Create your account" : "Welcome back"}
           </h2>
           {local && (
@@ -68,42 +74,58 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
               Local demo mode: a name identifies a diner and there is no password.
             </p>
           )}
-          <label className="block text-sm font-medium">
+          <label className="block text-sm font-semibold">
             {local ? "Your name" : "Email"}
             <input
-              className="field mt-1"
+              className="field mt-1 font-normal"
+              name={local ? "name" : "email"}
               type={local ? "text" : "email"}
               value={identifier}
               onChange={(event) => setIdentifier(event.target.value)}
               autoComplete={local ? "off" : "email"}
+              spellCheck={false}
               maxLength={local ? 40 : 254}
               required
             />
           </label>
           {!local && (
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-semibold">
               Password
               <input
-                className="field mt-1"
+                className="field mt-1 font-normal"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete={creating ? "new-password" : "current-password"}
                 minLength={8}
+                aria-describedby={creating ? "password-hint" : undefined}
                 required
               />
+              {creating && (
+                <span id="password-hint" className="text-muted mt-1 block font-normal">
+                  At least 8 characters.
+                </span>
+              )}
             </label>
           )}
           {error && <ErrorBanner message={error} />}
-          {info && <p className="bg-herb-soft text-herb rounded-xl px-4 py-3 text-sm">{info}</p>}
-          <button className="btn btn-primary w-full py-3" disabled={busy || !identifier.trim()}>
-            {busy ? "One moment…" : creating ? "Create account" : "Continue"}
+          {info && (
+            <p role="status" className="bg-notice rounded-control px-4 py-3 text-sm">
+              {info}
+            </p>
+          )}
+          <button className="btn btn-primary w-full" disabled={busy}>
+            {busy ? "One moment…" : action}
           </button>
           {!local && (
             <button
               type="button"
-              className="text-ember w-full text-sm font-semibold"
-              onClick={() => setCreating(!creating)}
+              className="btn-text w-full justify-center"
+              onClick={() => {
+                setCreating(!creating);
+                setError("");
+              }}
             >
               {creating ? "I already have an account" : "New here? Create an account"}
             </button>

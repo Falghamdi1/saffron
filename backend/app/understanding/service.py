@@ -6,6 +6,7 @@ if it fails.
 """
 
 import logging
+import re
 
 from app.memory.policy import normalize
 from app.schemas import Candidate, Understanding
@@ -13,6 +14,10 @@ from app.understanding import rules
 from app.understanding.llm import LLMError, UnderstandingProvider
 
 logger = logging.getLogger(__name__)
+
+# What a message has to mention before a diet can be set aside for the conversation.
+MEAT_TOPICS = r"vegetarian|veggie|vegan|pescatarian|\b(?:meat|chicken|lamb|beef|fish|prawns?)\b"
+DIET_TOPICS = {"gluten_free": r"gluten", "dairy_free": r"dairy|lactose|milk|cheese"}
 
 
 def understand(message: str, provider: UnderstandingProvider | None) -> tuple[Understanding, str]:
@@ -85,4 +90,13 @@ def _reconcile(message: str, model: Understanding, baseline: Understanding) -> U
     })
     if request.max_price is None and not any(c.category == "budget" for c in preferences):
         request = request.model_copy(update={"max_price": baseline.request.max_price})
+    # A saved diet is only lifted when the message actually speaks about it.
+    request = request.model_copy(update={
+        "relaxed_diets": [d for d in request.relaxed_diets if _speaks_of(source, d)]
+    })
     return model.model_copy(update={"preferences": preferences, "request": request})
+
+
+def _speaks_of(message: str, diet: str) -> bool:
+    words = DIET_TOPICS.get(diet.lower().replace("-", "_").replace(" ", "_"), MEAT_TOPICS)
+    return bool(re.search(words, message))

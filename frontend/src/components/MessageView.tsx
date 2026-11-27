@@ -1,6 +1,7 @@
 import type { MemoryAction, MemoryNote, Memory, Message } from "../types";
 import CompareTable from "./CompareTable";
-import DishCard from "./DishCard";
+import DishEntry from "./DishEntry";
+import Icon from "./Icons";
 import type { DishActions } from "./Workspace";
 
 interface Props {
@@ -10,19 +11,20 @@ interface Props {
   onChangeMemory: (id: string, action: MemoryAction) => Promise<void>;
 }
 
-const NOTE_STYLES: Record<MemoryNote["kind"], string> = {
-  saved: "bg-herb-soft text-herb",
-  updated: "bg-herb-soft text-herb",
-  removed: "bg-card text-muted",
-  temporary: "bg-card text-muted",
-  needs_confirmation: "bg-amber-100 text-amber-950",
-  conflict: "bg-alert-soft text-alert",
+const NOTE_ICONS: Record<MemoryNote["kind"], "note" | "info" | "warning"> = {
+  saved: "note",
+  updated: "note",
+  removed: "note",
+  temporary: "info",
+  needs_confirmation: "info",
+  conflict: "warning",
 };
 
 export default function MessageView({ message, memory, dishActions, onChangeMemory }: Props) {
   if (message.role === "user") {
     return (
-      <p className="bg-pine text-paper ml-auto max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5">
+      <p className="bg-pine text-paper rounded-panel ml-auto w-fit max-w-[85%] px-4 py-2.5 break-words">
+        <span className="sr-only">You said: </span>
         {message.content}
       </p>
     );
@@ -38,62 +40,70 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
   const awaiting = (id: string | null) =>
     memory?.preferences.find((p) => p.id === id && (p.status === "pending" || p.removal_requested));
 
+  const dishes = recommendations.length
+    ? recommendations
+    : comparison.length === 1
+      ? comparison
+      : [];
+
   return (
     <div className="flex flex-col gap-3">
       {memory_notes.length > 0 && (
-        <ul className="space-y-1.5" aria-label="Memory updates">
+        <ul className="border-line divide-line divide-y border-y text-sm" aria-label="Memory updates">
           {memory_notes.map((note) => {
             const preference = awaiting(note.preference_id);
             return (
-              <li key={note.message} className={`rounded-xl px-3 py-2 text-sm ${NOTE_STYLES[note.kind]}`}>
-                {note.message}
-                {preference && (
-                  <span className="mt-1.5 flex gap-2">
-                    <button
-                      className="btn btn-primary px-3 py-1 text-xs"
-                      onClick={() => void onChangeMemory(preference.id, "confirm")}
-                    >
-                      {preference.removal_requested ? "Yes, remove it" : "Yes, remember"}
-                    </button>
-                    <button
-                      className="btn btn-quiet px-3 py-1 text-xs"
-                      onClick={() => void onChangeMemory(preference.id, "dismiss")}
-                    >
-                      {preference.removal_requested ? "Keep it" : "No"}
-                    </button>
-                  </span>
-                )}
+              <li
+                key={note.message}
+                className={`flex gap-2 py-2 ${preference ? "bg-notice px-3" : ""} ${
+                  note.kind === "conflict" ? "text-alert" : ""
+                }`}
+              >
+                <Icon name={NOTE_ICONS[note.kind]} className="text-herb mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  {note.message}
+                  {preference && (
+                    <span className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => void onChangeMemory(preference.id, "confirm")}
+                      >
+                        {preference.removal_requested ? "Yes, remove it" : "Yes, remember"}
+                      </button>
+                      <button
+                        className="btn btn-quiet"
+                        onClick={() => void onChangeMemory(preference.id, "dismiss")}
+                      >
+                        {preference.removal_requested ? "Keep it" : "No, forget it"}
+                      </button>
+                    </span>
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
 
-      {text && <p>{text}</p>}
+      {text && <p className="leading-relaxed">{text}</p>}
 
-      {recommendations.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-          {recommendations.map((recommendation) => (
-            <DishCard
-              key={recommendation.item.id}
-              item={recommendation.item}
-              reasons={recommendation.reasons}
-              cautions={recommendation.cautions}
-              actions={dishActions}
-            />
+      {/* One sheet holding the dishes, not a card for each. */}
+      {dishes.length > 0 && (
+        <ul className="bg-card border-line divide-line rounded-panel divide-y border px-4">
+          {dishes.map((dish) => (
+            <li key={dish.item.id} className="py-4">
+              <DishEntry
+                item={dish.item}
+                reasons={"reasons" in dish ? dish.reasons : undefined}
+                cautions={"cautions" in dish ? dish.cautions : undefined}
+                violations={"violations" in dish ? dish.violations : undefined}
+                actions={dishActions}
+              />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      {comparison.length === 1 && (
-        <div className="max-w-sm">
-          <DishCard
-            item={comparison[0].item}
-            violations={comparison[0].violations}
-            actions={dishActions}
-          />
-        </div>
-      )}
       {comparison.length > 1 && (
         <CompareTable
           items={comparison.map((entry) => entry.item)}
@@ -102,10 +112,14 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
       )}
 
       {notice && (
-        <p className="border-alert/40 text-alert border-l-2 pl-3 text-xs leading-relaxed">{notice}</p>
+        <p className="text-alert flex gap-2 text-[13px] leading-relaxed">
+          <Icon name="warning" className="mt-0.5" />
+          {notice}
+        </p>
       )}
       {(engine === "fallback" || engine === "rules") && (
-        <p className="text-muted text-xs">
+        <p className="text-muted flex gap-2 text-[13px]">
+          <Icon name="info" className="mt-0.5" />
           I read this message with basic phrase matching and may have missed something. Please check
           “My preferences”, especially for allergies.
         </p>

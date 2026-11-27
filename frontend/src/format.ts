@@ -17,7 +17,8 @@ export const SPICE_NAMES = ["Not spicy", "Mild", "Medium", "Hot"];
 
 export const label = (value: string) => ALLERGEN_LABELS[value] ?? value.replace(/_/g, "-");
 
-export const price = (amount: number) => `SAR ${amount}`;
+// A non-breaking space keeps the currency with its amount.
+export const price = (amount: number) => `SAR ${amount}`;
 
 export function preferenceText(preference: Pick<Preference, "category" | "value">): string {
   const { category, value } = preference;

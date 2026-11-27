@@ -33,7 +33,7 @@ cd backend
 ```
 
 The second command scores Gemini on the held-out phrasings and runs the scenarios with it
-(about ten minutes, roughly 80 model calls), then updates `docs/EVALUATION.md`. If it reports
+(about twelve minutes, roughly 100 model calls), then updates `docs/evaluation.md`. If it reports
 failed model calls, fix that before deploying.
 
 Then run the app against Supabase from your machine and check it, so database permissions and
@@ -86,7 +86,7 @@ cd backend
 .\.venv\Scripts\python -m evaluation.live_check https://<your-app>.onrender.com
 ```
 
-Every line should read `PASS`, including `language model is in use`.
+All ten lines should read `PASS`, including `language model is in use`.
 
 Also check by hand, on a phone and a computer:
 

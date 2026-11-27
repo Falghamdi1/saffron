@@ -1,5 +1,6 @@
 """One chat turn: understand, update memory, recommend, reply."""
 
+import logging
 from dataclasses import dataclass, field, replace
 
 from psycopg import Connection
@@ -24,6 +25,8 @@ from app.understanding.llm import UnderstandingProvider
 from app.understanding.service import understand
 from app.vocabulary import singular
 
+logger = logging.getLogger(__name__)
+
 
 class ConversationNotFound(Exception):
     pass
@@ -46,6 +49,8 @@ def handle_message(
 ) -> dict:
     # The model call happens before the transaction so no connection waits on it.
     understanding, engine = understand(message, provider)
+    # Counting engines shows how often the fallback is used. No message text is logged.
+    logger.info("turn understood by %s", engine)
 
     with database.user_session(user_id) as connection:
         if conversation_id is None:
@@ -62,12 +67,16 @@ def handle_message(
         )
         state = conversation["context"]
         previous = RequestConstraints(**state.get("request", {}))
-        request = context.merge(
-            previous, context.clean(understanding.request), understanding.preferences
-        )
+        stated = context.clean(understanding.request)
+        request = context.merge(previous, stated, understanding.preferences)
         _note_table_allergies(connection, user_id, previous, request, notes)
+        # A price limit carried from an earlier message is worth mentioning when it bites.
+        earlier_limit = None
+        if stated.max_price is None and request.max_price == previous.max_price:
+            earlier_limit = previous.max_price
         turn, profile = _respond(
-            connection, user_id, message, understanding, request, state.get("shown", []), notes
+            connection, user_id, message, understanding, request,
+            state.get("shown", []), notes, earlier_limit,
         )
 
         payload = {
@@ -117,79 +126,95 @@ def _respond(
     request: RequestConstraints,
     shown: list[str],
     notes: list[MemoryNote],
+    earlier_limit: float | None,
 ) -> tuple[Turn, Profile]:
+    """Choose the kind of answer this message needs. May drop spent wants from `request`."""
     memory: list[Preference] = memory_repository.live_preferences(connection, user_id)
     menu = load_menu(connection)
     profile = build_profile(memory, request)
     mentioned = dishes.mentioned(message, menu)
     intent = understanding.intent
-    prefix = reply.acknowledgement(notes)
-
-    def respond(turn: Turn) -> tuple[Turn, Profile]:
-        turn.text = f"{prefix} {turn.text}".strip()
-        return turn, profile
-
-    def checked(items: list[MenuItem]) -> list[tuple[MenuItem, list[str]]]:
-        # A question about a named dish is not limited to the current course filter.
-        return [(item, violations(item, profile)) for item in items]
-
-    def table(pairs: list[tuple[MenuItem, list[str]]]) -> list[dict]:
-        return [{"item": i.model_dump(), "violations": v} for i, v in pairs]
+    unknown = ""
 
     if intent == "compare":
         by_id = {item.id: item for item in menu}
         targets = mentioned if len(mentioned) >= 2 else [by_id[i] for i in shown if i in by_id]
         if len(targets) < 2:
-            return respond(Turn("Which two dishes would you like me to compare?"))
-        pairs = checked(targets[:3])
-        request.wants = []  # a question about named dishes is not a standing request
-        return respond(Turn(
-            reply.comparison(pairs), comparison=table(pairs), shown=[i.id for i, _ in pairs]
-        ))
-
-    if mentioned and intent != "share" and not understanding.request.cheaper:
-        pairs = checked(mentioned[:3])
+            turn = Turn("Which two dishes would you like me to compare?")
+        else:
+            request.wants = []  # a question about named dishes is not a standing request
+            turn = _named_dishes(targets[:3], profile, reply.comparison)
+    elif mentioned and intent != "share" and not understanding.request.cheaper:
         request.wants = []
-        return respond(Turn(
-            reply.dish_facts(pairs), comparison=table(pairs), shown=[i.id for i, _ in pairs]
-        ))
+        turn = _named_dishes(mentioned[:3], profile, reply.dish_facts)
+    else:
+        missing = _unknown_dishes(understanding, menu) if intent == "dish_question" else []
+        if missing:
+            unknown = reply.unknown_dish(missing[0][:60]) + " These are on the menu instead."
+            # Do not keep searching for something the kitchen does not make.
+            request.wants = [w for w in request.wants if singular(w) not in map(singular, missing)]
+            profile = build_profile(memory, request)
 
-    unknown = ""
-    missing = _unknown_dishes(understanding, menu) if intent == "dish_question" else []
-    if missing:
-        unknown = reply.unknown_dish(missing[0][:60]) + " These are on the menu instead."
-        # Do not keep searching for something the kitchen does not make.
-        request.wants = [w for w in request.wants if singular(w) not in map(singular, missing)]
-        profile = build_profile(memory, request)
+        refresh_after_change = intent == "share" and shown and notes
+        if intent in ("recommend", "dish_question") or refresh_after_change:
+            turn = _suggestions(
+                menu, profile, shown, understanding.request.cheaper, earlier_limit
+            )
+        elif intent == "greeting":
+            turn = Turn(f"Welcome to Saffron. {reply.HELP}")
+        elif intent == "share" and notes:
+            turn = Turn("Would you like some suggestions?")
+        else:
+            turn = Turn("" if notes else reply.HELP)
 
-    refresh_after_change = intent == "share" and shown and notes
-    if not (intent in ("recommend", "dish_question") or refresh_after_change):
-        if intent == "greeting":
-            return respond(Turn(f"Welcome to Saffron. {reply.HELP}"))
-        if intent == "share" and notes:
-            return respond(Turn("Would you like some suggestions?"))
-        return respond(Turn("" if prefix else reply.HELP))
+    turn.text = " ".join(
+        part for part in (reply.acknowledgement(notes), unknown, turn.text) if part
+    )
+    return turn, profile
 
-    cheaper = understanding.request.cheaper
+
+def _named_dishes(items: list[MenuItem], profile: Profile, describe) -> Turn:
+    """Facts about specific dishes, each checked against the diner's requirements."""
+    # A question about a named dish is not limited to the current course filter.
+    pairs = [(item, violations(item, profile)) for item in items]
+    return Turn(
+        describe(pairs),
+        comparison=[{"item": i.model_dump(), "violations": v} for i, v in pairs],
+        shown=[i.id for i, _ in pairs],
+    )
+
+
+def _suggestions(
+    menu: list[MenuItem],
+    profile: Profile,
+    shown: list[str],
+    cheaper: bool,
+    earlier_limit: float | None,
+) -> Turn:
     if cheaper:
-        previous = [item for item in menu if item.id in shown]
-        if previous:
-            cap = min(item.price for item in previous) - 0.01
+        last = [item for item in menu if item.id in shown]
+        if last:
+            cap = min(item.price for item in last) - 0.01
             # "Cheaper" means a cheaper alternative to the same course.
             profile = replace(
                 profile,
-                category=profile.category or previous[0].category,
+                category=profile.category or last[0].category,
                 max_price=min(cap, profile.max_price or cap),
             )
 
     result = recommend(menu, profile)
-    names = [r.item.name for r in result.recommendations]
-    text = reply.recommendations(names, result.excluded, result.unmatched_wants, cheaper)
-    return respond(Turn(
-        f"{unknown} {text}".strip(),
+    text = reply.recommendations(
+        [r.item.name for r in result.recommendations],
+        result.excluded, result.unmatched_wants, cheaper,
+    )
+    over_budget = any("over your" in r for e in result.excluded for r in e.reasons)
+    if earlier_limit and over_budget and not cheaper:
+        text += " " + reply.earlier_limit(earlier_limit)
+    return Turn(
+        text,
         recommendations=result.recommendations,
         shown=[r.item.id for r in result.recommendations],
-    ))
+    )
 
 
 def _unknown_dishes(understanding: Understanding, menu: list[MenuItem]) -> list[str]:

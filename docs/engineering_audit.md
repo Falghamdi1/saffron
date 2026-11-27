@@ -16,10 +16,14 @@ describe the audited commit and are left as written. The fixes were deployed as 
 deployment. That check covers C1 (enforced in the chat, not saved), memory across
 conversations and isolation; the other fixes were verified locally, not on the live site.
 
+A later pass closed M4, L5 and the engine logging and redesigned the interface; those
+changes are not yet deployed. Current numbers are in [evaluation.md](evaluation.md), and
+current status is in [final_submission_checklist.md](final_submission_checklist.md).
+
 | Finding | State | How it was checked |
 | --- | --- | --- |
 | C1 other diners' allergies | Fixed, verified live | Audit probes re-run with Gemini and rules: no unsafe dish, notice shown, nothing saved; live check |
-| H1 third-person saved as the user's own | Fixed for the patterns covered; deployed | Same probes; unit tests with mocked wrong model output; gaps listed in LIMITATIONS.md |
+| H1 third-person saved as the user's own | Fixed for the patterns covered; deployed | Same probes; unit tests with mocked wrong model output; gaps listed in limitations.md |
 | H2 spice limit lost | Fixed, deployed | The audit message re-run with Gemini saved a mild spice level; tests |
 | H3 "too spicy" read as hot | Fixed, deployed | Tests and rules-only probe |
 | M1 stale requests | Fixed, deployed | Test with a scripted model; probe with Gemini |
@@ -27,7 +31,7 @@ conversations and isolation; the other fixes were verified locally, not on the l
 | H4 Gemini quota | Open | Needs an owner decision |
 | M3 keep-alive | Open | Owner must set `APP_URL` |
 | M4, L2 to L6 | Open | Phase 2 and 3 |
-| Evaluation after the fixes | Measured | 286 tests; 29/29 scenarios with rules and with Gemini (0 of 61 calls fell back); 0 violations in 31,526 sweep recommendations; held-out phrasings 27/30 with Gemini, 13/30 rules; attribution regression set (not held out) 9/10 with Gemini, 7/10 rules (EVALUATION.md) |
+| Evaluation after the fixes | Measured | 286 tests; 29/29 scenarios with rules and with Gemini (0 of 61 calls fell back); 0 violations in 31,526 sweep recommendations; held-out phrasings 27/30 with Gemini, 13/30 rules; attribution regression set (not held out) 9/10 with Gemini, 7/10 rules (evaluation.md) |
 | N1: rules missed “I've become vegetarian” and “I can handle medium spice now” | Fixed (present before Phase 1, found on re-test) | Tests; rules scores unchanged; no held-out sentence uses this wording |
 | Review of the fixes: “As someone with a nut allergy…” was treated as being about another person | Introduced by Phase 1, fixed before release | Tests with rules and mocked model output. Made after the Gemini evaluation run; rules scores re-checked and unchanged |
 | Audit scenarios, rules only | 39/44 before Phase 1, 38/44 after it, 42/44 after N1 | Remaining: a budget from earlier in the chat still applies (script error), and a medium-spice lamb dish can appear third for a mild preference |
@@ -72,7 +76,7 @@ architectural change is needed.
 | 2.5 Returning users, isolation | Met | Supabase Auth; RLS; 7 cross-user access attempts returned 404 or 401, and the target's allergy was unchanged |
 | 2.6 Deployed usable interface | Met | Live URL; health OK; smoke test passed (reported by the owner) |
 | 3 Menu ≥12 items, 3 categories, prices, veg/non-veg, spice, allergens, overlap | Met | 24 items, 4 categories, SAR 18–95, spice 0–3 |
-| 4 Deep dive: problem, prioritisation, scope, validation | Met | DECISIONS.md, ARCHITECTURE.md, EVALUATION.md |
+| 4 Deep dive: problem, prioritisation, scope, validation | Met | design-decisions.md, architecture.md, evaluation.md |
 | 6.1 Reviewer access and instructions | Met | README; sign-up without email confirmation |
 | 6.1 Remains available | At risk | Keep-alive workflow never ran (finding M3); cold start measured at 19 s |
 | 6.2 README with local run, architecture, decisions, setup, limitations; no secrets | Met | History scanned for `.env` values: none found |
@@ -225,7 +229,7 @@ Suggested measurable evaluations (most already exist):
 ## 8. Performance and reliability
 
 - Measured over 25 turns: median 0.69 s, maximum 1.10 s per turn including Gemini. This
-  contradicts the "about six seconds" in LIMITATIONS.md, which is out of date.
+  contradicts the "about six seconds" in limitations.md, which is out of date.
 - In that run, sent back to back by the audit itself on the shared production key, Gemini
   returned **8 rate-limit responses (HTTP 429)** and **7 of 25 turns** fell back to rules.
   This is synthetic load, not observed reviewer traffic. The UI labels fallback replies. There is no
@@ -259,7 +263,7 @@ Suggested measurable evaluations (most already exist):
 - Evidence: verified with both engines (section 5). Sesame dishes and "may contain"
   dishes were recommended, and the dish with incomplete allergen data was not withheld. No
   safety notice appeared.
-- Impact: a realistic table-ordering request yields unsafe suggestions. LIMITATIONS.md
+- Impact: a realistic table-ordering request yields unsafe suggestions. limitations.md
   says such allergies are "applied to that chat", which overstates what happens.
 - Fix: add a per-conversation `allergies` list to `RequestConstraints`, filled by the rules
   and the model for other diners. Merge it into the profile's hard allergy set for that

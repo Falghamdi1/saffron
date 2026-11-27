@@ -1,5 +1,16 @@
 # Remediation plan
 
+## Status
+
+| Items | State |
+| --- | --- |
+| Phase 1 (1 to 9) | Done and deployed, except 9: the `APP_URL` variable is still the owner's to set |
+| 11 (M4), 12 (L5), 13 (engine logging) | Done |
+| 10 (H4 retry and global limit) | Not done on purpose: retrying an exhausted free quota adds delay and uses more of it. A paid tier is the owner's decision |
+| Phase 3 (L2 to L4, L6) | Not done; listed in [limitations.md](limitations.md) |
+
+The plan below is as written before the work.
+
 Based on [engineering_audit.md](engineering_audit.md). The priority order is: assignment
 compliance and safety first, then correctness, reliability, user experience and
 maintainability. Every step adds tests before it changes behaviour and ends with the full

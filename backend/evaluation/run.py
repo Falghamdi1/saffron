@@ -2,12 +2,16 @@
 
     python -m evaluation.run          # deterministic, no API key needed
     python -m evaluation.run --llm    # also score extraction with Gemini (uses quota)
+
+Without --llm the report has no Gemini results, so regenerate with it before committing.
 """
 
 import argparse
 import itertools
 import json
 import platform
+import re
+import statistics
 import tempfile
 import time
 from collections import defaultdict
@@ -31,7 +35,7 @@ from evaluation.harness import Limits, Tally, violations_by_oracle
 from evaluation.scenarios import SCENARIOS, Context
 
 SECONDS_BETWEEN_CALLS = 6.5
-REPORT = ROOT_DIR / "docs" / "EVALUATION.md"
+REPORT = ROOT_DIR / "docs" / "evaluation.md"
 PARAPHRASES = Path(__file__).with_name("paraphrases.json")
 ATTRIBUTION = Path(__file__).with_name("attribution.json")
 
@@ -44,15 +48,19 @@ class PacedProvider:
     def __init__(self, provider) -> None:
         self._provider = provider
         self.calls = self.failures = 0
+        self.seconds: list[float] = []  # successful calls, excluding the pacing pause
 
     def understand(self, message):
         time.sleep(SECONDS_BETWEEN_CALLS)
         self.calls += 1
+        start = time.perf_counter()
         try:
-            return self._provider.understand(message)
+            result = self._provider.understand(message)
         except LLMError:
             self.failures += 1
             raise
+        self.seconds.append(time.perf_counter() - start)
+        return result
 
 
 def run_scenarios(settings: Settings, provider=None) -> tuple[list[dict], Tally]:
@@ -176,9 +184,83 @@ def percent(part: float, whole: float) -> str:
     return f"{100 * part / whole:.1f}%" if whole else "n/a"
 
 
+METHOD = """## Method
+
+| Layer | What it checks | How it is judged |
+| --- | --- | --- |
+| Unit and API tests (`pytest`) | policy, ranking, extraction, tokens, isolation | assertions |
+| Scenarios (`evaluation/scenarios.py`) | whole turns through the HTTP API | expected state |
+| Constraint sweep | every allergen pair, diet, budget and course | an independent checker |
+| Held-out phrasings | preference extraction | exact match, precision, recall |
+| Attribution set | whose statement it is | what is saved and what is enforced |
+| Live check (`evaluation/live_check.py`) | the deployed app with two accounts | pass or fail |
+
+The checker in `evaluation/harness.py` reads the raw menu records, so the recommender is
+not graded by its own filtering code. Scenarios run on a throwaway PostgreSQL database.
+"""
+
+PHRASING_HISTORY = (
+    "`evaluation/paraphrases.json` holds 30 messages written without consulting the "
+    "extraction patterns. Three of them are no longer fully unseen, because later fixes "
+    "touched them: “sesame seeds” was being stored as an unknown allergen (a safety defect "
+    "found by this set), “My colleague loves lamb” is covered by the rule about other "
+    "people, and a stop-word added for another bug removed a false positive in “the allergy "
+    "test was negative”. The first run scored 12/30 exact, 25% recall and 2/5 allergy "
+    "statements."
+)
+
+ATTRIBUTION_NOTE = (
+    "`evaluation/attribution.json` has sentences about other people, or about the customer "
+    "while mentioning others. The same author wrote it just before the attribution patterns, "
+    "and the patterns’ words for other people overlap with it, so it is a regression check, "
+    "not a held-out test. “Enforced” counts allergens applied either from memory or to the "
+    "current chat."
+)
+
+# Recorded by hand, so that a later clean run does not hide earlier problems.
+INCOMPLETE = """## Incomplete and failed runs
+
+- 2026-11-27, complete run with Gemini: 29/30 scenarios with no model call failing. The one
+  failure was a `MemoryError` on the test machine, whose memory another program had used up.
+  That scenario passes with rules and passed in earlier Gemini runs.
+- 2026-11-28, rerun: the free tier's limit of 500 requests a day for the model was reached
+  part-way through the scenarios. The phrasing and attribution sets finished before that.
+"""
+
+NOT_COVERED = """## Not covered by this report
+
+- The browser interface. It has no automated tests; screens were checked by hand.
+- The deployed application. Run `evaluation/live_check.py` against it.
+- Load, concurrency beyond one user at a time, and long-running memory growth.
+- A real phone. Narrow layouts were checked in an emulated viewport.
+- Independent test authors. The same author wrote the code, scenarios and sentence sets.
+- Run-to-run variation. Model results come from one run; individual cases do change
+  between runs.
+
+See [limitations.md](limitations.md) for the product's known limitations.
+"""
+
+
+def _fallback_notes(scores: dict[str, dict]) -> list[str]:
+    return [
+        f"{name}: {s['fallbacks']} of {s['cases']} model calls failed and used rules, so this "
+        "row is not a pure model result."
+        for name, s in scores.items() if s["fallbacks"]
+    ]
+
+
+def _misses(scores: dict[str, dict], heading: str) -> list[str]:
+    lines: list[str] = []
+    for name, score in scores.items():
+        if score["misses"]:
+            lines += ["", f"{heading} with {name}:", ""]
+            lines += [f"- {message}" for message in score["misses"]]
+    return lines
+
+
 def render(
     results: list[dict], tally: Tally, sweep: dict, extraction: dict[str, dict],
-    live: dict | None = None, attribution: dict[str, dict] | None = None,
+    attribution: dict[str, dict], live: dict | None = None,
 ) -> str:
     by_area: dict[str, list[dict]] = defaultdict(list)
     for result in results:
@@ -186,19 +268,19 @@ def render(
 
     def area(name: str) -> str:
         rows = by_area[name]
-        passed = sum(r["passed"] for r in rows)
-        return f"{passed}/{len(rows)} ({percent(passed, len(rows))})"
+        return f"{sum(r['passed'] for r in rows)}/{len(rows)}"
 
     passed = sum(r["passed"] for r in results)
     lines = [
-        "# Evaluation report",
+        "# Evaluation",
         "",
-        "Generated by `python -m evaluation.run`. Do not edit by hand.",
+        "Generated by `python -m evaluation.run --llm`. Do not edit by hand.",
         "",
         f"Run on {date.today().isoformat()}, Python {platform.python_version()}, "
         "PostgreSQL via pgserver.",
         "",
-        "## Summary",
+        METHOD,
+        "## Results without a language model",
         "",
         "| Measure | Result |",
         "| --- | --- |",
@@ -212,93 +294,92 @@ def render(
         f"| Cross-user isolation scenarios | {area('isolation')} |",
         f"| Recommendation quality scenarios (expected results) | {area('quality')} |",
         "",
-        "The table above and the sweep use the deterministic rule extractor, so they "
-        "measure memory, filtering, ranking and access control, not language understanding. "
-        "The scenarios were written by the same author as the code; they are regression "
-        "evidence, not an independent benchmark.",
+        "These use the rule extractor, so they measure memory, filtering, ranking and access "
+        "control, not language understanding. They are regression evidence, not an "
+        "independent benchmark.",
         "",
-        "## Language understanding on unseen phrasings",
+    ]
+
+    if live:
+        passed_live = sum(r["passed"] for r in live["results"])
+        timing = ""
+        if live["seconds"]:
+            timing = (
+                f" Successful model calls took {statistics.median(live['seconds']):.1f} s at "
+                f"the median and {max(live['seconds']):.1f} s at most, from one machine."
+            )
+        lines += [
+            "## Scenarios with Gemini",
+            "",
+            f"{passed_live}/{len(live['results'])} scenarios passed with {live['model']} "
+            f"reading messages. {live['failures']} of {live['calls']} model calls failed and "
+            f"used rules. Hard-constraint violations: {len(live['tally'].violations)} of "
+            f"{live['tally'].recommendations} recommendations.{timing}",
+            "",
+        ]
+        if live["failures"]:
+            lines += [
+                "**This is not a complete model result:** the turns that failed were "
+                "read by the rules, so the pass count above says little about the model.",
+                "",
+            ]
+        lines += [
+            f"- Failed: {r['title']} ({r['detail']})" for r in live["results"] if not r["passed"]
+        ]
+    else:
+        lines += ["Gemini was not run (`--llm` with an API key).", ""]
+
+    lines += [
+        "## Language understanding on held-out phrasings",
         "",
-        "`evaluation/paraphrases.json` holds messages written without consulting the "
-        "extraction patterns, and no pattern has been added to match them.",
-        "",
-        "The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It exposed a "
-        "safety defect: “sesame seeds” was stored as an unknown allergen, so tahini dishes were "
-        "not excluded. Allergen canonicalisation was fixed (and covered by tests), so that one "
-        "case is no longer unseen. Later, an audit led to a general rule for statements about "
-        "other people, which also covers the “My colleague loves lamb” case, so that case is "
-        "no longer unseen either. A stop-word added for a related bug (“my allergy” read as an "
-        "allergen) also removed the rules’ one false positive on this set, in “the allergy test "
-        "was negative”, which is why rules precision is higher than in earlier runs.",
+        PHRASING_HISTORY,
         "",
         "| Extractor | Exact match | Precision | Recall | Allergy statements caught |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for name, score in extraction.items():
-        lines.append(
-            f"| {name} | {score['exact']}/{score['cases']} | {score['precision']:.0%} | "
-            f"{score['recall']:.0%} | {score['allergy_found']}/{score['allergy_total']} |"
-        )
-        if score["fallbacks"]:
-            lines.append(
-                f"\n{score['fallbacks']} of {score['cases']} model calls failed and used rules."
-            )
-    if not any(name.startswith("Gemini") for name in extraction):
-        lines += ["", "Gemini has not been scored in this run (`--llm` with an API key)."]
-    for name, score in extraction.items():
-        if score["misses"]:
-            lines += ["", f"Messages {name} got wrong:", ""]
-            lines += [f"- {message}" for message in score["misses"]]
+    lines += [
+        f"| {name} | {s['exact']}/{s['cases']} | {s['precision']:.0%} | {s['recall']:.0%} | "
+        f"{s['allergy_found']}/{s['allergy_total']} |"
+        for name, s in extraction.items()
+    ]
+    lines += ["", *_fallback_notes(extraction), *_misses(extraction, "Messages wrong")]
 
     lines += [
-        "", "## Whose statement is it?", "",
-        "`evaluation/attribution.json` has sentences about other people, or about the customer "
-        "while mentioning others. The same author wrote it just before the attribution patterns, "
-        "and the patterns’ words for other people overlap with it, so it is a regression check, "
-        "not a held-out test. “Enforced” counts allergens applied either from memory or to the "
-        "current chat.",
-        "",
+        "", "## Whose statement is it?", "", ATTRIBUTION_NOTE, "",
         "| Extractor | Fully correct | Allergens enforced | Messages saving something wrong |",
         "| --- | --- | --- | --- |",
     ]
-    for name, score in (attribution or {}).items():
-        lines.append(
-            f"| {name} | {score['correct']}/{score['cases']} | "
-            f"{score['enforced']}/{score['expected']} | {score['wrongly_saved']} |"
-        )
-        if score["fallbacks"]:
-            lines.append(
-                f"\n{score['fallbacks']} of {score['cases']} model calls failed and used rules."
-            )
-    for name, score in (attribution or {}).items():
-        if score["misses"]:
-            lines += ["", f"Not fully correct with {name}:", ""]
-            lines += [f"- {message}" for message in score["misses"]]
+    lines += [
+        f"| {name} | {s['correct']}/{s['cases']} | {s['enforced']}/{s['expected']} | "
+        f"{s['wrongly_saved']} |"
+        for name, s in attribution.items()
+    ]
+    lines += ["", *_fallback_notes(attribution), *_misses(attribution, "Not fully correct")]
 
-    if live:
-        passed_live = sum(r["passed"] for r in live["results"])
-        lines += [
-            "", "## Scenarios with Gemini", "",
-            f"{passed_live}/{len(live['results'])} scenarios passed with {live['model']} reading "
-            f"messages. {live['failures']} of {live['calls']} model calls failed and used rules. "
-            f"Hard-constraint violations: {len(live['tally'].violations)} of "
-            f"{live['tally'].recommendations} recommendations.",
-        ]
-        lines += [
-            f"- Failed: {r['title']} ({r['detail']})" for r in live["results"] if not r["passed"]
-        ]
-        lines += [
-            "",
-            "The first live run passed 23/26. It showed a hedged statement (“I don't eat much "
-            "meat”) stored as a firm dislike, and “Do you have sushi?” not saying that sushi "
-            "is not served; both were fixed. The third failure was a scenario that accepted only "
-            "one of two correct history events, and the scenario was corrected.",
-        ]
-    lines += ["", "## Scenarios", "", "| Area | Scenario | Result |", "| --- | --- | --- |"]
+    lines += [
+        "",
+        "## Failures found by evaluation",
+        "",
+        "Fixed, with tests unless noted:",
+        "",
+        "- “sesame seeds” stored as an unknown allergen, so tahini dishes were not excluded.",
+        "- The first Gemini run passed 23/26 scenarios: a hedged statement stored as a firm "
+        "dislike, an unknown dish not reported, and one scenario that was itself wrong.",
+        "- The audit: another diner's allergy was not enforced, questions about other people "
+        "were saved as the customer's allergy, spice limits were lost, and old requests "
+        "shaped later answers ([engineering_audit.md](engineering_audit.md)).",
+        "",
+        "## Scenarios",
+        "",
+        "| Area | Scenario | Result |",
+        "| --- | --- | --- |",
+    ]
     for result in results:
         outcome = "Pass" if result["passed"] else f"**Fail**: {result['detail']}"
         lines.append(f"| {result['area']} | {result['title']} | {outcome} |")
-    return "\n".join(lines) + "\n"
+    lines += ["", INCOMPLETE, NOT_COVERED]
+    text = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", text).rstrip() + "\n"
 
 
 def main() -> None:
@@ -332,15 +413,17 @@ def main() -> None:
             live = None
             if provider:
                 provider.calls = provider.failures = 0
+                provider.seconds.clear()
                 live_results, live_tally = run_scenarios(settings, provider)
                 live = {
                     "model": model, "results": live_results, "tally": live_tally,
                     "calls": provider.calls, "failures": provider.failures,
+                    "seconds": list(provider.seconds),
                 }
         finally:
             server.cleanup()
 
-    report = render(results, tally, constraint_sweep(), extraction, live, attribution)
+    report = render(results, tally, constraint_sweep(), extraction, attribution, live)
     REPORT.parent.mkdir(exist_ok=True)
     REPORT.write_text(report, encoding="utf-8", newline="\n")
     print(report)

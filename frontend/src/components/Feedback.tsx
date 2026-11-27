@@ -1,7 +1,12 @@
-export function Loading({ label = "Loading" }: { label?: string }) {
+import Icon from "./Icons";
+
+export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
-    <div role="status" className="text-muted flex items-center justify-center gap-3 p-10 text-sm">
-      <span className="border-line border-t-pine size-4 animate-spin rounded-full border-2" />
+    <div role="status" className="text-muted flex items-center gap-3 py-4 text-sm">
+      <span
+        aria-hidden="true"
+        className="border-line border-t-pine size-4 animate-spin rounded-full border-2"
+      />
       {label}
     </div>
   );
@@ -11,11 +16,12 @@ export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: (
   return (
     <div
       role="alert"
-      className="bg-alert-soft text-alert flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+      className="bg-alert-soft text-alert rounded-control flex items-center gap-3 px-4 py-2 text-sm"
     >
-      <span>{message}</span>
+      <Icon name="warning" />
+      <span className="flex-1">{message}</span>
       {onRetry && (
-        <button className="shrink-0 font-semibold underline" onClick={onRetry}>
+        <button className="min-h-10 shrink-0 font-semibold underline" onClick={onRetry}>
           Try again
         </button>
       )}

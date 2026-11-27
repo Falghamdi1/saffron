@@ -331,3 +331,15 @@ def test_rules_do_not_save_a_wish_a_question_or_a_one_off(message):
         c for c in rules(message).preferences
         if c.category in ("diet", "spice") and c.scope == "persistent"
     ]
+
+
+@pytest.mark.parametrize(("message", "diet", "kept"), [
+    ("Surprise me today", "gluten_free", False),
+    ("Surprise me today", "vegetarian", False),
+    ("Forget the gluten thing tonight", "gluten_free", True),
+    ("I'll have meat tonight", "vegetarian", True),
+])
+def test_a_diet_is_only_set_aside_when_the_message_mentions_it(message, diet, kept):
+    model = Understanding(request={"relaxed_diets": [diet]})
+    result, _ = understand(message, FakeProvider(model))
+    assert result.request.relaxed_diets == ([diet] if kept else [])

@@ -71,6 +71,10 @@ def recommendations(
     return " ".join(parts)
 
 
+def earlier_limit(amount: float) -> str:
+    return f"I'm still keeping to the SAR {amount:g} limit you gave earlier in this chat."
+
+
 def dish_facts(checked: list[tuple[MenuItem, list[str]]]) -> str:
     sentences = []
     for item, problems in checked:
@@ -92,7 +96,7 @@ def dish_facts(checked: list[tuple[MenuItem, list[str]]]) -> str:
 def comparison(checked: list[tuple[MenuItem, list[str]]]) -> str:
     cheapest = min(checked, key=lambda pair: pair[0].price)[0]
     text = (
-        f"Here is {_join([item.name for item, _ in checked])} side by side. "
+        f"Here are {_join([item.name for item, _ in checked])} side by side. "
         f"{cheapest.name} is the least expensive."
     )
     blocked = [f"{item.name} ({'; '.join(problems)})" for item, problems in checked if problems]

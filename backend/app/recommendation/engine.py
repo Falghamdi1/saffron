@@ -163,9 +163,9 @@ def _score(item: MenuItem, profile: Profile) -> tuple[float, list[str]]:
         reasons.append(f"SAR {item.price:g}, within your SAR {profile.max_price:g} budget")
     allergies = sorted(profile.allergies | profile.unconfirmed_allergies)
     if allergies:
-        reasons.append(
-            f"No {', '.join(label(a) for a in allergies)} listed in its recorded ingredients"
-        )
+        *rest, last = [label(a) for a in allergies]
+        named = f"{', '.join(rest)} or {last}" if rest else last
+        reasons.append(f"No {named} listed in its recorded ingredients")
     if not reasons:
         reasons.append(item.description)
     return score, reasons

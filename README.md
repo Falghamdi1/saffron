@@ -23,7 +23,7 @@ one quietly shrinks the menu forever. So the language model is only allowed to *
 1. The model (or a rule-based fallback) turns a message into **candidate** changes.
 2. A deterministic **memory policy** decides what each candidate does.
 3. A deterministic **recommender** filters hard constraints, then ranks.
-4. Reply text and dish cards are built from **menu records**, not generated.
+4. Reply text and dish entries are built from **menu records**, not generated.
 
 Rules the policy enforces:
 
@@ -31,7 +31,32 @@ Rules the policy enforces:
 - Hedged statements ("I think I might be…") stay pending. A pending allergy is still
   avoided; a pending diet is not enforced.
 - "Today I want…" shapes the conversation and is never saved.
+- Statements about other people are not saved. Their allergies apply to that conversation.
 - Corrections supersede the old record. History is append-only at the database level.
+
+## Architecture
+
+One FastAPI service serves the API and the React client. Supabase provides authentication
+and PostgreSQL with Row Level Security; Gemini reads messages and can be swapped out.
+
+```text
+message → understanding → memory policy → PostgreSQL → recommender → templated reply
+          (Gemini + rules)  (pure code)                (filter, then rank)
+```
+
+More in [architecture](docs/architecture.md) and [database schema](docs/database.md).
+
+## Key decisions
+
+| Decision | Why | Cost |
+| --- | --- | --- |
+| The model proposes, code decides | safety rules are testable and independent of the model | nuance outside the schema is lost |
+| Replies are templates | no invented dishes, prices or allergen claims | plain voice |
+| Structured memory, no vector store | preferences need exact supersede and retract | free-form facts are not kept |
+| Conservative allergen filtering | "may contain" and missing data exclude | some safe dishes are hidden |
+| Rules back up the model | the app keeps working without it | the fallback understands far less |
+
+Full reasoning in [design decisions](docs/design-decisions.md).
 
 ## Run it locally
 
@@ -52,8 +77,9 @@ cd ..\backend
 Open <http://localhost:8000>. On macOS or Linux use `.venv/bin/python`.
 
 To use Gemini for message understanding, copy `.env.example` to `.env` and set
-`GEMINI_API_KEY`. For frontend development, run `npm run dev` in `frontend/` alongside the
-backend; `/api` is proxied.
+`GEMINI_API_KEY`. For Supabase and hosting, see [deployment](docs/deployment.md). For
+frontend development, run `npm run dev` in `frontend/` alongside the backend; `/api` is
+proxied.
 
 ## Try it
 
@@ -75,13 +101,27 @@ backend; `/api` is proxied.
 ```powershell
 cd backend
 .\.venv\Scripts\python -m pytest
-.\.venv\Scripts\python -m evaluation.run
+.\.venv\Scripts\python -m evaluation.run --llm
 ```
 
-Add `--llm` to also score Gemini (needs a key). Latest measured results are in
-[docs/EVALUATION.md](docs/EVALUATION.md). No hard-constraint violation was found in the
-constraint sweep. On 30 held-out phrasings Gemini matched 27 exactly and the rule-based
-fallback 13, so the fallback is a safety net, not a substitute for the model.
+`--llm` needs a Gemini key and takes about twelve minutes. Running without it is quicker but
+replaces the report with a rules-only one. Latest measured results are in
+[docs/evaluation.md](docs/evaluation.md). No hard-constraint violation was found in the
+constraint sweep. On 30 held-out phrasings Gemini matched 28 exactly and the rule-based
+fallback 13, so the fallback is a safety net, not a substitute for the model. The latest run
+of the scenarios with Gemini was cut short by the free daily quota; the report says what is
+and is not complete.
+
+## Known limitations
+
+- English only; replies are templated and the model sees one message at a time.
+- Without Gemini, many natural phrasings are missed. The free quota is shared, so it can run
+  out.
+- Whom a sentence is about is decided by wording patterns.
+- Allergen data is fictional and cannot rule out cross-contact.
+- No frontend tests, load testing or Content-Security-Policy.
+
+The full list is in [limitations](docs/limitations.md).
 
 ## Layout
 
@@ -93,25 +133,25 @@ backend/app/
   chat/             one turn: understand, remember, recommend, reply
   api.py auth.py db.py
 backend/data/menu.json     24 dishes, 4 categories
-backend/evaluation/        scenarios, held-out phrasings, report generator
+backend/evaluation/        scenarios, sentence sets, report generator, live check
 frontend/src/              React client
 supabase/migrations/       schema and Row Level Security
 ```
 
 ## Documentation
 
-- [Requirements checklist](docs/REQUIREMENTS.md)
-- [Architecture](docs/ARCHITECTURE.md) and [database schema](docs/DATABASE.md)
-- [Design decisions](docs/DECISIONS.md)
-- [Evaluation report](docs/EVALUATION.md)
-- [Known limitations](docs/LIMITATIONS.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Video walkthrough outline](docs/VIDEO_WALKTHROUGH.md)
+- [Submission checklist](docs/final_submission_checklist.md): every requirement, with status
+- [Architecture](docs/architecture.md), [database schema](docs/database.md) and
+  [interface design](docs/interface.md)
+- [Design decisions](docs/design-decisions.md): the deep-dive challenge
+- [Evaluation](docs/evaluation.md) and [known limitations](docs/limitations.md)
+- [Engineering audit](docs/engineering_audit.md) and [remediation plan](docs/remediation_plan.md)
+- [Deployment](docs/deployment.md) and [demonstration script](docs/demo_script.md)
 
 ## Use of AI tools
 
-AI coding assistants were used extensively for implementation, research and drafting.
-Behaviour described here is backed by the tests and the generated evaluation report;
-anything not verified is listed under known limitations.
+AI coding assistants were used extensively for implementation, research, review and
+drafting, including the engineering audit. Behaviour described here is backed by the tests
+and the generated evaluation report; anything not verified is listed as such.
 
 The restaurant, menu and allergen data are fictional sample data.

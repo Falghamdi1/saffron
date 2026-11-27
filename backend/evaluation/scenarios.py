@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.understanding.llm import LLMError
-from evaluation.harness import Diner, Limits, Tally, picks
+from evaluation.harness import MENU, Diner, Limits, Tally, picks
 
 
 @dataclass
@@ -362,3 +362,24 @@ def no_stale_request(ctx: Context) -> None:
     diner.say("Can I have the pistachio ice cream?")
     reply = diner.say("recommend a dessert")
     expect("couldn't find" not in reply["content"], reply["content"])
+
+
+@scenario("robustness", "Every dish shown is exactly the menu record, with its real price")
+def menu_grounding(ctx: Context) -> None:
+    diner = ctx.diner()
+    for message in (
+        "recommend a main",
+        "compare butter chicken and chicken vindaloo",
+        "what is in the hummus?",
+        "any desserts?",
+    ):
+        reply = diner.say(message)
+        payload = reply["payload"]
+        shown = payload["recommendations"] + payload["comparison"]
+        expect(bool(shown), f"nothing shown for {message}")
+        for entry in shown:
+            item = entry["item"]
+            expect(item == MENU[item["id"]].model_dump(), f"{item['id']} differs from the menu")
+        if message.startswith("what is in"):
+            price = f"SAR {MENU['hummus'].price:g}"
+            expect(price in reply["content"], f"reply lacks {price}: {reply['content']}")

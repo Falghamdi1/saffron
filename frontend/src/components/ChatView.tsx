@@ -3,6 +3,7 @@ import type { Api } from "../api";
 import { preferenceText } from "../format";
 import type { Conversation, Memory, MemoryAction, Message } from "../types";
 import { ErrorBanner, Loading } from "./Feedback";
+import Icon from "./Icons";
 import MessageView from "./MessageView";
 import type { DishActions } from "./Workspace";
 
@@ -19,11 +20,10 @@ interface Props {
   dishActions: DishActions;
   onMemoryChanged: () => Promise<void>;
   onChangeMemory: (id: string, action: MemoryAction) => Promise<void>;
-  onShowMemory: () => void;
 }
 
 export default function ChatView(props: Props) {
-  const { api, memory, dishActions, onMemoryChanged, onChangeMemory, onShowMemory } = props;
+  const { api, memory, dishActions, onMemoryChanged, onChangeMemory } = props;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +32,7 @@ export default function ChatView(props: Props) {
   const [error, setError] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
+  const question = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -45,9 +46,16 @@ export default function ChatView(props: Props) {
     void refreshConversations();
   }, [refreshConversations]);
 
+  // Long answers start at the question, so memory notes and the reply are not scrolled past.
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
+    if (messages.at(-1)?.role === "assistant") {
+      question.current?.scrollIntoView({ block: "start" });
+    } else if (messages.length > 0) {
+      bottom.current?.scrollIntoView({ block: "end" });
+    }
   }, [messages, busy]);
+
+  const lastQuestion = messages.map((m) => m.role).lastIndexOf("user");
 
   async function open(id: string | null) {
     setHistoryOpen(false);
@@ -95,21 +103,25 @@ export default function ChatView(props: Props) {
   const live = memory?.preferences ?? [];
 
   return (
-    <div className="grid h-full grid-cols-1 md:grid-cols-[15rem_1fr] xl:grid-cols-[15rem_1fr_18rem]">
+    <div className="grid h-full grid-cols-1 md:grid-cols-[14rem_1fr] xl:grid-cols-[15rem_1fr_17rem]">
       <aside
-        className={`border-line overflow-y-auto border-r p-3 ${
+        aria-label="Past conversations"
+        className={`border-line overflow-y-auto overscroll-contain border-r p-3 ${
           historyOpen ? "block" : "hidden md:block"
         }`}
       >
         {historyOpen && (
-          <button className="btn btn-quiet mb-2 w-full md:hidden" onClick={() => setHistoryOpen(false)}>
+          <button
+            className="btn btn-quiet mb-2 w-full md:hidden"
+            onClick={() => setHistoryOpen(false)}
+          >
             Back to chat
           </button>
         )}
-        <button className="btn btn-primary w-full" onClick={() => void open(null)}>
+        <button className="btn btn-quiet w-full" onClick={() => void open(null)}>
           New conversation
         </button>
-        <p className="eyebrow mt-4 mb-1 px-2">Previous</p>
+        <h2 className="mt-5 mb-1 px-2 text-sm font-semibold">Earlier conversations</h2>
         {conversations.length === 0 && (
           <p className="text-muted px-2 text-sm">Your past chats will appear here.</p>
         )}
@@ -117,9 +129,13 @@ export default function ChatView(props: Props) {
           {conversations.map((conversation) => (
             <li key={conversation.id}>
               <button
-                className={`w-full truncate rounded-lg px-2 py-2 text-left text-sm ${
-                  conversation.id === conversationId ? "bg-card font-semibold" : "hover:bg-card"
+                className={`rounded-control min-h-10 w-full truncate px-2 text-left text-sm pointer-coarse:min-h-11 ${
+                  conversation.id === conversationId
+                    ? "bg-line/50 font-semibold"
+                    : "text-muted hover:text-ink hover:bg-line/30"
                 }`}
+                aria-current={conversation.id === conversationId ? "true" : undefined}
+                title={conversation.title}
                 onClick={() => void open(conversation.id)}
               >
                 {conversation.title}
@@ -130,70 +146,79 @@ export default function ChatView(props: Props) {
       </aside>
 
       <section
-        className={`min-h-0 flex-col ${historyOpen ? "hidden md:flex" : "flex"}`}
+        className={`min-h-0 min-w-0 flex-col ${historyOpen ? "hidden md:flex" : "flex"}`}
         aria-label="Conversation"
       >
-        <div className="border-line flex gap-2 border-b p-2 md:hidden">
-          <button className="btn btn-quiet" onClick={() => setHistoryOpen(true)}>
+        <div className="border-line flex gap-5 border-b px-4 md:hidden">
+          <button className="btn-text" onClick={() => setHistoryOpen(true)}>
             History
           </button>
-          <button className="btn btn-quiet" onClick={() => void open(null)}>
+          <button className="btn-text" onClick={() => void open(null)}>
             New chat
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-5" aria-live="polite">
-          <div className="mx-auto flex max-w-3xl flex-col gap-5">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5" aria-live="polite">
+          <div className="mx-auto flex max-w-2xl flex-col gap-5">
             {messages.length === 0 && busy === "idle" && (
-              <div className="pt-8 text-center">
-                <h2 className="font-display text-3xl">What are you in the mood for?</h2>
-                <p className="text-muted mt-2">
+              <div className="pt-2 sm:pt-8">
+                <h2 className="font-display text-3xl font-semibold">What are you in the mood for?</h2>
+                <p className="text-muted mt-2 max-w-prose">
                   Mention allergies, tastes or a budget as they come to you. I'll remember them for
                   next time.
                 </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <h3 className="mt-7 text-sm font-semibold">Try one of these</h3>
+                <ul className="border-line divide-line mt-2 divide-y border-y">
                   {SUGGESTIONS.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      className="btn btn-quiet font-normal"
-                      onClick={() => void send(suggestion)}
-                    >
-                      {suggestion}
-                    </button>
+                    <li key={suggestion}>
+                      <button
+                        className="hover:text-pine hover:bg-card flex min-h-12 w-full items-center justify-between gap-3 px-1 text-left"
+                        onClick={() => void send(suggestion)}
+                      >
+                        {suggestion}
+                        <Icon name="arrow" className="text-ember" />
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
             {messages.map((message, index) => (
-              <MessageView
-                key={index}
-                message={message}
-                memory={memory}
-                dishActions={dishActions}
-                onChangeMemory={onChangeMemory}
-              />
+              <div key={index} ref={index === lastQuestion ? question : undefined}>
+                <MessageView
+                  message={message}
+                  memory={memory}
+                  dishActions={dishActions}
+                  onChangeMemory={onChangeMemory}
+                />
+              </div>
             ))}
             {busy !== "idle" && (
-              <Loading label={busy === "sending" ? "Checking the menu" : "Opening conversation"} />
+              <Loading label={busy === "sending" ? "Checking the menu…" : "Opening conversation…"} />
             )}
             {error && <ErrorBanner message={error} />}
             <div ref={bottom} />
           </div>
         </div>
 
-        <form onSubmit={submit} className="border-line bg-paper border-t p-3">
-          <div className="mx-auto flex max-w-3xl gap-2">
+        <form
+          onSubmit={submit}
+          className="border-line bg-paper border-t px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        >
+          <div className="mx-auto flex max-w-2xl gap-2">
             <label className="sr-only" htmlFor="message">
               Message
             </label>
             <input
               id="message"
-              className="field rounded-full px-5"
+              name="message"
+              className="field"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="e.g. something light, no dairy"
+              placeholder="e.g. something light, no dairy…"
               maxLength={1000}
               autoComplete="off"
+              enterKeyHint="send"
             />
             <button className="btn btn-primary px-5" disabled={!draft.trim() || busy !== "idle"}>
               Send
@@ -203,35 +228,42 @@ export default function ChatView(props: Props) {
       </section>
 
       <aside className="border-line hidden overflow-y-auto border-l p-4 xl:block">
-        <h2 className="font-display text-lg">What I remember</h2>
+        <h2 className="font-display border-ink border-b pb-1.5 text-lg font-semibold">
+          What I remember
+        </h2>
         {live.length === 0 ? (
           <p className="text-muted mt-2 text-sm">
             Nothing yet. Preferences you mention will show up here straight away.
           </p>
         ) : (
-          <ul className="mt-3 space-y-2">
+          <ul className="divide-line divide-y">
             {live.map((preference) => (
               <li
                 key={preference.id}
-                className={`rounded-xl border px-3 py-2 text-sm ${
-                  preference.category === "allergy"
-                    ? "border-alert/30 bg-alert-soft"
-                    : "border-line bg-card"
+                className={`flex gap-2 py-2 text-sm ${
+                  preference.category === "allergy" ? "text-alert font-medium" : ""
                 }`}
               >
-                {preferenceText(preference)}
-                {(preference.status === "pending" || preference.removal_requested) && (
-                  <span className="text-ember block text-xs font-semibold">
-                    Waiting for your confirmation
-                  </span>
-                )}
+                <Icon
+                  name={preference.category === "allergy" ? "warning" : "note"}
+                  className="mt-0.5"
+                />
+                <span>
+                  {preferenceText(preference)}
+                  {(preference.status === "pending" || preference.removal_requested) && (
+                    <span className="text-ember block text-xs font-semibold">
+                      Waiting for your confirmation
+                    </span>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
         )}
-        <button className="text-ember mt-3 text-sm font-semibold" onClick={onShowMemory}>
-          Review and edit →
-        </button>
+        <a className="btn-text mt-2" href="#preferences">
+          Review and edit
+          <Icon name="arrow" />
+        </a>
       </aside>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Api } from "../api";
 import type { Memory, MenuEntry } from "../types";
-import DishCard from "./DishCard";
+import DishEntry from "./DishEntry";
 import { ErrorBanner, Loading } from "./Feedback";
 import type { DishActions } from "./Workspace";
 
@@ -38,46 +38,64 @@ export default function MenuView({ api, memory, dishActions }: Props) {
   }, [load, memory]);
 
   const visible = items?.filter((item) => !suitableOnly || item.violations.length === 0) ?? [];
+  const sections = SECTIONS.map(([category, title]) => ({
+    category,
+    title,
+    dishes: visible.filter((item) => item.category === category),
+  })).filter((section) => section.dishes.length > 0);
 
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-display text-2xl">The menu</h1>
-          <label className="flex items-center gap-2 text-sm">
+    <div className="h-full overflow-y-auto overscroll-contain">
+      <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6">
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <h1 className="font-display text-3xl font-semibold">The menu</h1>
+          <label className="btn-text cursor-pointer">
             <input
               type="checkbox"
-              className="accent-pine size-4"
+              className="size-4"
               checked={suitableOnly}
               onChange={(event) => setSuitableOnly(event.target.checked)}
             />
             Only dishes that suit me
           </label>
         </div>
-        {error && <ErrorBanner message={error} onRetry={() => void load()} />}
-        {!items && !error && <Loading label="Fetching the menu" />}
-        {items && visible.length === 0 && (
-          <p className="text-muted mt-6">No dishes match all of your requirements today.</p>
+        {sections.length > 1 && (
+          <nav aria-label="Courses" className="mt-1 flex flex-wrap gap-x-5">
+            {sections.map((section) => (
+              <button
+                key={section.category}
+                className="btn-text"
+                onClick={() =>
+                  document.getElementById(`course-${section.category}`)?.scrollIntoView()
+                }
+              >
+                {section.title}
+              </button>
+            ))}
+          </nav>
         )}
-        {SECTIONS.map(([category, title]) => {
-          const section = visible.filter((item) => item.category === category);
-          if (section.length === 0) return null;
-          return (
-            <section key={category} className="mt-6">
-              <h2 className="eyebrow mb-2">{title}</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {section.map((item) => (
-                  <DishCard
-                    key={item.id}
-                    item={item}
-                    violations={item.violations}
-                    actions={dishActions}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+        {error && <ErrorBanner message={error} onRetry={() => void load()} />}
+        {!items && !error && <Loading label="Fetching the menu…" />}
+        {items && visible.length === 0 && (
+          <p className="text-muted mt-6">
+            Nothing on the menu meets all of your requirements today. Untick “Only dishes that suit
+            me” to see why each dish is ruled out.
+          </p>
+        )}
+        {sections.map((section) => (
+          <section key={section.category} id={`course-${section.category}`} className="pt-7">
+            <h2 className="section-title">{section.title}</h2>
+            <ul className="grid gap-x-12 md:grid-cols-2">
+              {section.dishes.map((item) => (
+                <li key={item.id} className="border-line flex border-b py-4">
+                  <div className="flex w-full flex-col">
+                    <DishEntry item={item} violations={item.violations} actions={dishActions} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
       </div>
     </div>
   );
