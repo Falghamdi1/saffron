@@ -156,7 +156,12 @@ def render(results: list[dict], tally: Tally, sweep: dict, extraction: dict[str,
         "## Language understanding on unseen phrasings",
         "",
         "`evaluation/paraphrases.json` holds messages written without consulting the "
-        "extraction patterns. The patterns were not changed to improve this score.",
+        "extraction patterns, and no pattern has been added to match them.",
+        "",
+        "The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It exposed a "
+        "safety defect: “sesame seeds” was stored as an unknown allergen, so tahini dishes were "
+        "not excluded. Allergen canonicalisation was fixed (and covered by tests), so that one "
+        "case is no longer unseen.",
         "",
         "| Extractor | Exact match | Precision | Recall | Allergy statements caught |",
         "| --- | --- | --- | --- | --- |",

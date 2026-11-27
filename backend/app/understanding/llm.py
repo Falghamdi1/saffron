@@ -45,6 +45,16 @@ class UnderstandingProvider(Protocol):
     def understand(self, message: str) -> Understanding: ...
 
 
+def response_schema() -> dict:
+    """The Understanding schema with every field the pipeline relies on required."""
+    schema = Understanding.model_json_schema()
+    schema["required"] = ["intent", "preferences", "request"]
+    schema["$defs"]["Candidate"]["required"] = [
+        "category", "value", "operation", "scope", "certainty", "evidence"
+    ]
+    return schema
+
+
 class GeminiProvider:
     """Gemini Interactions API with a JSON schema response."""
 
@@ -65,7 +75,7 @@ class GeminiProvider:
             "response_format": {
                 "type": "text",
                 "mime_type": "application/json",
-                "schema": Understanding.model_json_schema(),
+                "schema": response_schema(),
             },
         }
         try:

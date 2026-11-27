@@ -42,8 +42,10 @@ def _keys(candidate: Candidate) -> set[tuple[str, str]]:
 def _reconcile(message: str, model: Understanding, baseline: Understanding) -> Understanding:
     source = _squash(message)
     # A preference the model cannot quote from the message is treated as invented.
+    # Favourite dishes are only ever saved from the menu, never from model output.
     preferences = [
-        c for c in model.preferences if c.evidence and _squash(c.evidence) in source
+        c for c in model.preferences
+        if c.category != "favorite_dish" and c.evidence and _squash(c.evidence) in source
     ]
 
     hedged = {key for c in baseline.preferences if c.certainty == "uncertain" for key in _keys(c)}

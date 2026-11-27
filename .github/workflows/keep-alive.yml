@@ -1,0 +1,20 @@
+# Free tiers sleep when idle: Render after minutes, Supabase after about a week.
+# /api/health queries the database, so one request keeps both warm.
+# Set the repository variable APP_URL to enable. Scheduled runs are best effort.
+name: Keep alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    if: vars.APP_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl --fail --silent --show-error --max-time 90 "$APP_URL/api/health"
+        env:
+          APP_URL: ${{ vars.APP_URL }}

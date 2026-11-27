@@ -118,3 +118,14 @@ def test_confirming_a_pending_preference_activates_it():
     memory = [stored("diet", "vegetarian", status="pending")]
     decision = decide(candidate("diet", "vegetarian"), memory)
     assert actions(decision) == [("update", "confirmed", "vegetarian", "active")]
+
+
+@pytest.mark.parametrize(("phrase", "allergens"), [
+    ("sesame seeds", {"sesame"}),
+    ("peanut butter", {"peanut"}),
+    ("egg whites", {"egg"}),
+    ("pine nuts", {"tree_nut"}),
+    ("coconut", {"coconut"}),
+])
+def test_multi_word_allergies_resolve_to_tracked_allergens(phrase, allergens):
+    assert {c.value for c in normalize(candidate("allergy", phrase))} == allergens

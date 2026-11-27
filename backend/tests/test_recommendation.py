@@ -109,3 +109,10 @@ def test_unmatched_food_request_is_reported(menu):
 ])
 def test_dish_mentions(menu, message, expected):
     assert [i.id for i in mentioned(message, menu)] == expected
+
+
+def test_disliking_one_dairy_food_does_not_exclude_all_dairy(menu):
+    cheese = ids(recommend(menu, Profile(dislikes=frozenset({"cheese"})), limit=100))
+    dairy = ids(recommend(menu, Profile(dislikes=frozenset({"dairy"})), limit=100))
+    assert "butter-chicken" in cheese and "halloumi-skewers" not in cheese
+    assert "butter-chicken" not in dairy

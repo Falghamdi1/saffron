@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from app.schemas import Exclusion, MenuItem, Preference, Recommendation, RequestConstraints
 from app.vocabulary import (
+    ALLERGEN_CLASSES,
     ALLERGENS,
     INGREDIENT_GROUPS,
     SPICE_LEVELS,
@@ -109,7 +110,8 @@ def violations(item: MenuItem, profile: Profile) -> list[str]:
             found.append("may contain gluten")
 
     for food in sorted(profile.dislikes):
-        if matches_food(item, food) or set(allergens_for(food)) & set(item.allergens):
+        covered = allergens_for(food) if food in ALLERGEN_CLASSES else ()
+        if matches_food(item, food) or set(covered) & set(item.allergens):
             found.append(f"includes {food}, which you avoid")
 
     if profile.max_price is not None and item.price > profile.max_price:

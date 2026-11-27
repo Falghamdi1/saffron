@@ -239,7 +239,7 @@ def _tastes(clause: str, out: _Extraction) -> bool:
     dislike = re.search(
         r"\bi (?:really |absolutely |just |actually )?(?:hate|dislike|detest|loathe|can't stand|"
         r"don't like|do not like|don't enjoy|no longer like|no longer love|stopped liking|"
-        r"don't love) (.+)|\b(?:i'm )?not a (?:big )?fan of (.+)",
+        r"don't love|don't eat|do not eat|never eat) (.+)|\b(?:i'm )?not a (?:big )?fan of (.+)",
         clause,
     )
     if dislike:
@@ -275,7 +275,7 @@ def _request(clause: str, out: _Extraction, preference_clause: bool) -> None:
     request = out.request
     for category, pattern in (
         ("starter", r"\b(starters?|appeti[sz]ers?)\b"),
-        ("main", r"\b(mains?|main course|entree)\b"),
+        ("main", r"\b(mains?|main course|entree|dinner|lunch)\b"),
         ("dessert", r"\b(desserts?|something sweet)\b"),
         ("drink", r"\b(drinks?|beverages?|something to drink)\b"),
     ):
@@ -341,7 +341,7 @@ def understand(message: str) -> Understanding:
         diet = _diets(clause, out)
         spice = _spice(clause, out)
         _budget(clause, out)
-        taste = False if allergy else _tastes(clause, out)
+        taste = False if allergy or diet else _tastes(clause, out)
         _request(clause, out, preference_clause=allergy or diet or taste)
         if spice and out.request.spice is None and TEMPORARY.search(clause):
             out.request.spice = _spice_level(clause)

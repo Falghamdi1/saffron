@@ -61,6 +61,11 @@ INGREDIENT_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Words naming a whole allergen class. Disliking "dairy" covers every dairy dish,
+# while disliking "cheese" covers only dishes that contain cheese.
+ALLERGEN_CLASSES = ("dairy", "nut", "tree nut", "shellfish", "seafood", "gluten", "egg", "soy")
+
+
 def singular(word: str) -> str:
     """Reduce a food term to a comparable singular form."""
     word = " ".join(word.lower().split())
@@ -75,10 +80,14 @@ def singular(word: str) -> str:
 
 def allergens_for(term: str) -> tuple[str, ...]:
     """Return the canonical allergens a phrase refers to, or () if none."""
-    term = singular(term.replace("_", " "))
-    if term.endswith(" allergy"):
-        term = term.removesuffix(" allergy")
-    return ALLERGEN_SYNONYMS.get(term, ())
+    term = singular(term.replace("_", " ")).removesuffix(" allergy")
+    if term in ALLERGEN_SYNONYMS:
+        return ALLERGEN_SYNONYMS[term]
+    # "sesame seeds" or "peanut butter" must still resolve to the tracked allergen.
+    found: list[str] = []
+    for word in term.split():
+        found += ALLERGEN_SYNONYMS.get(singular(word), ())
+    return tuple(dict.fromkeys(found))
 
 
 def label(value: str) -> str:

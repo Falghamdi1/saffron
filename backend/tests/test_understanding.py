@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from app.schemas import Candidate, Understanding
-from app.understanding.llm import GeminiProvider, LLMError
+from app.understanding.llm import GeminiProvider, LLMError, response_schema
 from app.understanding.rules import understand as rules
 from app.understanding.service import understand
 
@@ -123,3 +123,15 @@ def test_hedged_diet_cannot_be_upgraded_by_the_model():
     ])
     result, _ = understand("I don't eat much meat", FakeProvider(sure))
     assert result.preferences[0].certainty == "uncertain"
+
+
+def test_model_cannot_invent_a_favourite_dish():
+    invented = Understanding(preferences=[
+        Candidate(category="favorite_dish", value="sushi", evidence="sushi")
+    ])
+    result, _ = understand("sushi", FakeProvider(invented))
+    assert result.preferences == []
+
+
+def test_gemini_schema_requires_the_fields_the_pipeline_depends_on():
+    assert "evidence" in response_schema()["$defs"]["Candidate"]["required"]

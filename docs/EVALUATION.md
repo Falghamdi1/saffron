@@ -20,18 +20,19 @@ The scenarios and the sweep run with the deterministic rule extractor, so they m
 
 ## Language understanding on unseen phrasings
 
-`evaluation/paraphrases.json` holds messages written without consulting the extraction patterns. The patterns were not changed to improve this score.
+`evaluation/paraphrases.json` holds messages written without consulting the extraction patterns, and no pattern has been added to match them.
+
+The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It exposed a safety defect: “sesame seeds” was stored as an unknown allergen, so tahini dishes were not excluded. Allergen canonicalisation was fixed (and covered by tests), so that one case is no longer unseen.
 
 | Extractor | Exact match | Precision | Recall | Allergy statements caught |
 | --- | --- | --- | --- | --- |
-| Rules only | 12/30 | 75% | 25% | 2/5 |
+| Rules only | 13/30 | 88% | 29% | 3/5 |
 
 Gemini has not been scored in this run (`--llm` with an API key).
 
 Messages Rules only got wrong:
 
 - Peanuts will put me in hospital
-- I'm severely allergic to sesame seeds
 - Dairy makes me really ill
 - No gluten for me, I'm coeliac
 - Meat is off the table for me, and fish too
