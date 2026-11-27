@@ -8,6 +8,8 @@
   locally generated signing key.
 - The Gemini adapter has only been tested against mocked responses. Its request format
   follows the documentation but has never received a live answer.
+- Evaluation scenarios have only run with the rule extractor, so they do not yet describe
+  how the app behaves when Gemini reads the messages.
 
 ## Safety
 

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Category = Literal[
     "allergy", "diet", "like", "dislike", "cuisine", "spice", "budget", "favorite_dish"
@@ -51,6 +51,12 @@ class RequestConstraints(BaseModel):
     max_price: float | None = Field(default=None, gt=0)
     spice: int | None = Field(default=None, ge=0, le=3)
     cheaper: bool = False
+
+    @field_validator("max_price", mode="before")
+    @classmethod
+    def no_limit_when_not_positive(cls, value):
+        """Models sometimes send 0 to mean "no budget"."""
+        return None if isinstance(value, int | float) and value <= 0 else value
 
 
 class Understanding(BaseModel):

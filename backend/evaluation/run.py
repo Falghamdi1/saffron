@@ -22,20 +22,40 @@ from app.main import create_app
 from app.memory.policy import normalize
 from app.recommendation.engine import Profile, recommend
 from app.setup_db import load_menu_file, setup_database
-from app.understanding.llm import GeminiProvider
+from app.understanding.llm import GeminiProvider, LLMError
 from app.understanding.service import understand
 from app.vocabulary import ALLERGENS, DIETS
 from evaluation.harness import Limits, Tally, violations_by_oracle
 from evaluation.scenarios import SCENARIOS, Context
 
+SECONDS_BETWEEN_CALLS = 6.5
 REPORT = ROOT_DIR / "docs" / "EVALUATION.md"
 PARAPHRASES = Path(__file__).with_name("paraphrases.json")
 
 
-def run_scenarios(settings: Settings) -> tuple[list[dict], Tally]:
+class PacedProvider:
+    """Keeps a real model inside free-tier rate limits and counts its failures."""
+
+    name = "gemini"
+
+    def __init__(self, provider) -> None:
+        self._provider = provider
+        self.calls = self.failures = 0
+
+    def understand(self, message):
+        time.sleep(SECONDS_BETWEEN_CALLS)
+        self.calls += 1
+        try:
+            return self._provider.understand(message)
+        except LLMError:
+            self.failures += 1
+            raise
+
+
+def run_scenarios(settings: Settings, provider=None) -> tuple[list[dict], Tally]:
     tally = Tally()
     results = []
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app(settings, provider=provider)) as client:
         context = Context(client, settings, tally)
         for scenario in SCENARIOS:
             try:
@@ -80,9 +100,7 @@ def extraction_score(provider) -> dict:
     misses = []
     for case in cases:
         result, engine = understand(case["message"], provider)
-        if provider is not None:
-            fallbacks += engine == "fallback"
-            time.sleep(6.5)  # stay inside free-tier requests per minute
+        fallbacks += engine == "fallback"
         got = {
             (c.category, c.value, c.operation)
             for candidate in result.preferences if candidate.scope == "persistent"
@@ -115,7 +133,10 @@ def percent(part: float, whole: float) -> str:
     return f"{100 * part / whole:.1f}%" if whole else "n/a"
 
 
-def render(results: list[dict], tally: Tally, sweep: dict, extraction: dict[str, dict]) -> str:
+def render(
+    results: list[dict], tally: Tally, sweep: dict, extraction: dict[str, dict],
+    live: dict | None = None,
+) -> str:
     by_area: dict[str, list[dict]] = defaultdict(list)
     for result in results:
         by_area[result["area"]].append(result)
@@ -182,6 +203,18 @@ def render(results: list[dict], tally: Tally, sweep: dict, extraction: dict[str,
             lines += ["", f"Messages {name} got wrong:", ""]
             lines += [f"- {message}" for message in score["misses"]]
 
+    if live:
+        passed_live = sum(r["passed"] for r in live["results"])
+        lines += [
+            "", "## Scenarios with Gemini", "",
+            f"{passed_live}/{len(live['results'])} scenarios passed with {live['model']} reading "
+            f"messages. {live['failures']} of {live['calls']} model calls failed and used rules. "
+            f"Hard-constraint violations: {len(live['tally'].violations)} of "
+            f"{live['tally'].recommendations} recommendations.",
+        ]
+        lines += [
+            f"- Failed: {r['title']} ({r['detail']})" for r in live["results"] if not r["passed"]
+        ]
     lines += ["", "## Scenarios", "", "| Area | Scenario | Result |", "| --- | --- | --- |"]
     for result in results:
         outcome = "Pass" if result["passed"] else f"**Fail**: {result['detail']}"
@@ -191,16 +224,20 @@ def render(results: list[dict], tally: Tally, sweep: dict, extraction: dict[str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--llm", action="store_true", help="also score Gemini extraction")
+    parser.add_argument(
+        "--llm", action="store_true", help="also run extraction and scenarios with Gemini"
+    )
     args = parser.parse_args()
 
     extraction = {"Rules only": extraction_score(None)}
+    provider = None
     if args.llm:
         configured = Settings()
         if not configured.gemini_api_key:
             parser.error("--llm needs GEMINI_API_KEY")
-        provider = GeminiProvider(configured.gemini_api_key, configured.gemini_model)
-        extraction[f"Gemini ({configured.gemini_model}) + rules"] = extraction_score(provider)
+        model = configured.gemini_model
+        provider = PacedProvider(GeminiProvider(configured.gemini_api_key, model))
+        extraction[f"Gemini ({model}) + rules"] = extraction_score(provider)
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
         server = pgserver.get_server(directory, cleanup_mode="stop")
@@ -211,10 +248,18 @@ def main() -> None:
                 gemini_api_key="", chat_rate_limit_per_minute=1000,
             )
             results, tally = run_scenarios(settings)
+            live = None
+            if provider:
+                provider.calls = provider.failures = 0
+                live_results, live_tally = run_scenarios(settings, provider)
+                live = {
+                    "model": model, "results": live_results, "tally": live_tally,
+                    "calls": provider.calls, "failures": provider.failures,
+                }
         finally:
             server.cleanup()
 
-    report = render(results, tally, constraint_sweep(), extraction)
+    report = render(results, tally, constraint_sweep(), extraction, live)
     REPORT.parent.mkdir(exist_ok=True)
     REPORT.write_text(report, encoding="utf-8", newline="\n")
     print(report)

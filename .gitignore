@@ -9,5 +9,6 @@ __pycache__/
 node_modules/
 dist/
 .localdb/
+.claude/
 # Assignment brief is not part of the submission
 AI_Engineer_Take_Home_Assignment__1_.pdf

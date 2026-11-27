@@ -31,8 +31,19 @@ cd backend
 .\.venv\Scripts\python -m evaluation.run --llm
 ```
 
-The second command scores Gemini on the held-out phrasings (about four minutes) and updates
-`docs/EVALUATION.md`. If it reports failed model calls, fix that before deploying.
+The second command scores Gemini on the held-out phrasings and runs the scenarios with it
+(about ten minutes, roughly 80 model calls), then updates `docs/EVALUATION.md`. If it reports
+failed model calls, fix that before deploying.
+
+Then run the app against Supabase from your machine and check it, so database permissions and
+token verification are proven before hosting is involved:
+
+```powershell
+.\.venv\Scripts\python -m uvicorn app.main:create_app --factory --port 8000
+```
+
+In a second terminal, set the `CHECK_*` variables from step 6 and run
+`.\.venv\Scripts\python -m evaluation.live_check http://127.0.0.1:8000`.
 
 ## 3. GitHub
 
@@ -56,6 +67,10 @@ Check that the CI workflow passes.
 
 In the GitHub repository, add an Actions **variable** `APP_URL` with the Render URL, and run
 the *Keep alive* workflow once by hand.
+
+A run every ten minutes is about 4,300 billed minutes a month. That is free for public
+repositories but exceeds the free allowance of a private one: for a private repository,
+disable the workflow and point an external uptime monitor at `/api/health` instead.
 
 ## 6. Verify the live application
 

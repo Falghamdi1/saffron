@@ -134,4 +134,19 @@ def test_model_cannot_invent_a_favourite_dish():
 
 
 def test_gemini_schema_requires_the_fields_the_pipeline_depends_on():
-    assert "evidence" in response_schema()["$defs"]["Candidate"]["required"]
+    schema = response_schema()
+    assert "evidence" in schema["properties"]["preferences"]["items"]["required"]
+
+
+def test_gemini_schema_uses_only_the_documented_subset():
+    schema = response_schema()
+    text = json.dumps(schema)
+    for keyword in ("$ref", "$defs", "anyOf", "default", "exclusiveMinimum", "maxLength"):
+        assert f'"{keyword}"' not in text
+    request = schema["properties"]["request"]["properties"]
+    assert request["max_price"]["type"] == ["number", "null"]
+    assert None in request["category"]["enum"]
+
+
+def test_zero_budget_from_a_model_means_no_budget():
+    assert Understanding(request={"max_price": 0}).request.max_price is None

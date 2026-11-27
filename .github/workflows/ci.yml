@@ -22,6 +22,12 @@ jobs:
       - run: ruff check .
       - run: pytest -q
 
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build .
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
