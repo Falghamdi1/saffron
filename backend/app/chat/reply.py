@@ -25,7 +25,7 @@ def safety_notice(profile: Profile) -> str:
     notice = (
         f"Checked against recorded ingredient and “may contain” data for "
         f"{_join([label(a) for a in allergies])}. This cannot rule out cross-contact in the "
-        "kitchen, so please tell your server about your allergy."
+        "kitchen, so please tell your server about the allergy."
     )
     untracked = [a for a in allergies if a not in ALLERGENS]
     if untracked:
@@ -34,6 +34,13 @@ def safety_notice(profile: Profile) -> str:
             "ingredient names were checked."
         )
     return notice
+
+
+def table_allergies(allergies: list[str]) -> str:
+    return (
+        f"For this chat only, I'm also avoiding {_join([label(a) for a in allergies])}. It is "
+        "not saved to your preferences; if it is your own allergy, tell me “I'm allergic to …”."
+    )
 
 
 def acknowledgement(notes: list[MemoryNote]) -> str:

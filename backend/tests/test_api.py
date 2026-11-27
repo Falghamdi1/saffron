@@ -325,3 +325,31 @@ def test_pasted_environment_values_are_trimmed(monkeypatch):
     settings = Settings(_env_file=None, auth_mode="local")
     assert settings.database_url.endswith("sslmode=require")
     assert settings.gemini_api_key == "not-a-real-key"
+
+
+class Scripted:
+    """A model double that answers each message with a prepared understanding."""
+
+    name = "scripted"
+
+    def __init__(self, replies):
+        self.replies = replies
+
+    def understand(self, message):
+        return Understanding(**self.replies.get(message, {}))
+
+
+def test_a_dish_question_does_not_shape_the_next_request(settings):
+    script = Scripted({
+        "Can I get the pistachio ice cream?": {
+            "intent": "dish_question",
+            "request": {"category": "dessert", "wants": ["pistachio ice cream"]},
+        },
+        "Recommend a dessert": {"intent": "recommend", "request": {"category": "dessert"}},
+    })
+    with TestClient(create_app(settings, provider=script)) as client:
+        diner = Diner(client)
+        diner.say("Can I get the pistachio ice cream?")
+        reply = diner.say("Recommend a dessert")
+        assert "couldn't find" not in reply["content"]
+        assert picks(reply)

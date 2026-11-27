@@ -15,13 +15,18 @@
   Do not run it for real diners in rules-only mode.
 - Even with a model, an allergy can be misread. The preferences panel is the check.
 - An allergen outside the tracked list is only matched against ingredient names.
+- Whether a statement is about the customer or someone else is decided by wording patterns.
+  Allergies mentioned for others are enforced for that chat but not remembered, and:
+  - ways of agreeing such as "so do I", "neither can I" or "same here" are not recognised,
+    so a shared allergy phrased that way is not saved to the customer's profile;
+  - without Gemini, indirect phrasings ("sesame makes them very ill") are not caught at all.
+- Without Gemini, some diet statements are missed ("I've become vegetarian").
 
 ## Behaviour
 
 - English only.
-- Gemini can attribute someone else's taste to the user: "My colleague loves lamb" was saved
-  as the user's own preference.
-- A live call took about six seconds, so replies feel slow.
+- Turns measured during the audit took about 0.7 s at the median and 1.1 s at most,
+  including some that fell back to rules. Earlier single calls took several seconds.
 - The model sees one message at a time, so "yes", "that one" or "the second" are not
   understood. Confirmations use buttons.
 - Replies are templated.
@@ -29,8 +34,9 @@
 - Preferences are a fixed set of categories; other facts are not remembered.
 - Reopened conversations show recommendations as they were then, even if preferences or the
   menu have since changed.
-- Group dining is not modelled. Another person's allergy is applied to that chat only, and
-  only for common phrasings.
+- Group dining is only partly modelled. Another person's allergy is a hard filter for the rest
+  of that chat (including "may contain" and incomplete data) and cannot be lifted except by
+  starting a new chat. Their diet and tastes are not tracked.
 
 ## Engineering
 

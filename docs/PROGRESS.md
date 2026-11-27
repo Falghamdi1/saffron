@@ -25,4 +25,8 @@
   and then on a newline pasted into `DATABASE_URL`; the app now trims such values. The live
   smoke test passed against the deployment.
 
-Open: manual check on a phone, keep-alive variable, video, submission.
+- Audited the project (engineering_audit.md). Fixed: other diners' allergies not enforced or
+  saved as the customer's own, lost spice limits, and requests carried into later turns. The
+  fixes are not yet deployed.
+
+Open: deploy the fixes, manual check on a phone, keep-alive variable, video, submission.

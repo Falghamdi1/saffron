@@ -61,11 +61,11 @@ def handle_message(
             connection, user_id, understanding.preferences, message
         )
         state = conversation["context"]
+        previous = RequestConstraints(**state.get("request", {}))
         request = context.merge(
-            RequestConstraints(**state.get("request", {})),
-            context.clean(understanding.request),
-            understanding.preferences,
+            previous, context.clean(understanding.request), understanding.preferences
         )
+        _note_table_allergies(connection, user_id, previous, request, notes)
         turn, profile = _respond(
             connection, user_id, message, understanding, request, state.get("shown", []), notes
         )
@@ -90,6 +90,23 @@ def handle_message(
         "conversation_id": conversation_id,
         "message": {"role": "assistant", "content": turn.text, "payload": payload},
     }
+
+
+def _note_table_allergies(
+    connection: Connection,
+    user_id: str,
+    previous: RequestConstraints,
+    request: RequestConstraints,
+    notes: list[MemoryNote],
+) -> None:
+    """Say which allergies now apply to this chat without being the customer's own."""
+    known = set(previous.allergies) | {
+        p.value for p in memory_repository.live_preferences(connection, user_id)
+        if p.category == "allergy"
+    }
+    added = [a for a in request.allergies if a not in known]
+    if added:
+        notes.append(MemoryNote(kind="temporary", message=reply.table_allergies(added)))
 
 
 def _respond(
@@ -125,12 +142,14 @@ def _respond(
         if len(targets) < 2:
             return respond(Turn("Which two dishes would you like me to compare?"))
         pairs = checked(targets[:3])
+        request.wants = []  # a question about named dishes is not a standing request
         return respond(Turn(
             reply.comparison(pairs), comparison=table(pairs), shown=[i.id for i, _ in pairs]
         ))
 
     if mentioned and intent != "share" and not understanding.request.cheaper:
         pairs = checked(mentioned[:3])
+        request.wants = []
         return respond(Turn(
             reply.dish_facts(pairs), comparison=table(pairs), shown=[i.id for i, _ in pairs]
         ))
@@ -184,6 +203,7 @@ def _unknown_dishes(understanding: Understanding, menu: list[MenuItem]) -> list[
     # may also list the unknown dish as a wanted food, which does not count.
     asked = {singular(name) for name in names}
     other = understanding.request.model_copy(update={
-        "wants": [w for w in understanding.request.wants if singular(w) not in asked]
+        "wants": [w for w in understanding.request.wants if singular(w) not in asked],
+        "allergies": [],
     })
     return names if other == RequestConstraints() else []

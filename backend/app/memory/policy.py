@@ -12,6 +12,7 @@ Safety invariants:
 * Superseded values are kept, so history is never lost.
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -30,6 +31,7 @@ from app.vocabulary import (
 SINGLE_VALUED = ("spice", "budget")
 ANIMAL_FOODS = {"meat", "chicken", "lamb", "beef", "prawn", "fish", "sea bass", "seafood"}
 MEAT_FOODS = {"meat", "chicken", "lamb", "beef"}
+SPICE_WORDING = re.compile(r"\bspic(?:y|e|es|iness)\b|^heat$")
 DIET_ALIASES = {"plant based": "vegan", "veggie": "vegetarian", "lactose free": "dairy_free"}
 
 
@@ -87,7 +89,8 @@ def normalize(candidate: Candidate) -> list[Candidate]:
     elif category == "favorite_dish":
         values = (candidate.value,)
     else:
-        values = (singular(raw),)
+        # "Very spicy food" is a spice level, not a food to like or avoid.
+        values = () if SPICE_WORDING.search(raw) else (singular(raw),)
     return [candidate.model_copy(update={"value": value}) for value in values]
 
 

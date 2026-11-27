@@ -78,6 +78,7 @@ stateDiagram-v2
 | "I'm vegan" after "vegetarian" | vegetarian superseded, other records untouched |
 | "I don't eat much meat" | vegetarian proposed, not enforced |
 | "Today I want something spicy" | conversation context only |
+| "My wife is allergic to sesame" | enforced for this chat only; not saved to the profile |
 | "I love chicken" while vegetarian | not saved; asks whether the diet changed |
 
 Short-term state ("today", "cheaper than that") lives in `conversations.context`, separate

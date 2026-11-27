@@ -20,10 +20,28 @@ FOODS = {
     "kunafa", "risotto", "shawarma", "kabsa", "soup", "pasta", "bread", "chocolate",
     "okra", "eggplant", "aubergine", "broccoli", "cauliflower", "avocado", "pork", "bean",
 }
+# Words that precede "allergy" without naming one.
+NOT_ALLERGY_NAMES = {
+    "a", "an", "my", "the", "food", "any", "have", "no", "his", "her", "their", "serious", "bad",
+}
 NOT_FOODS = {"nothing", "anything", "none", "something", "everything"}
 SOMEONE_ELSE = re.compile(
-    r"\b(?:my (?:friend|wife|husband|partner|son|daughter|kid|child|brother|sister|mum|mom|"
-    r"dad|mother|father|colleague|guest)|(?:he|she|they)(?: is|'s| are|'re))\b"
+    r"\b(?:my|our) (?:\w+ )?(?:friend|wife|husband|partner|son|daughter|kid|child|children|"
+    r"baby|brother|sister|mum|mom|dad|mother|father|parent|grandma|grandpa|grandmother|"
+    r"grandfather|nephew|niece|boyfriend|girlfriend|flatmate|roommate|colleague|boss|"
+    r"neighbou?r|guest|youngest|eldest)s?\b"
+    r"|\b(?:someone|somebody|anyone|people|a (?:friend|guest|person)) (?:who|with|that)\b"
+    r"|\bone of (?:our|my|the) (?:guests|friends|colleagues|kids)\b"
+    r"|\bfor (?:someone|somebody|a guest|a friend)\b"
+    r"|\b(?:he|she)(?: is|'s| has| can't| cannot)\b"
+    r"|\bthey(?: are|'re| have| can't| cannot)\b(?=.*\ballerg)"
+)
+# The customer speaking about themselves in the same clause outweighs a mention of others.
+SELF = re.compile(
+    r"\bi(?:'m| am)?(?: also| really| both| do)? (?:allergic|love|like|enjoy|adore|prefer|"
+    r"hate|dislike|can't|cannot|don't|vegetarian|vegan|pescatarian)\b"
+    r"|\bi (?:also )?have (?:a |an )?(?:[a-z]+ ){1,2}allerg"
+    r"|\b(?:so am i|me too|me and|and me|and i|myself and|and myself)\b"
 )
 SPICY_WORDS = ("spicy", "spice", "spiciness", "heat", "hot food", "hot dishes")
 
@@ -41,7 +59,9 @@ SOFTENED = re.compile(
 )
 CLAUSE_BREAK = re.compile(
     r"[.!?;\n]+|,?\s+\b(?:but|although|though|however)\b\s+|,\s*(?=i\b|i'm\b|my\b)|"
-    r"\s+and\s+(?=i\b|i'm\b|i've\b|my\b)|,\s*(?=(?:recommend|suggest|what|can|show|give)\b)"
+    # "me and my son" stays together, so the customer is not lost from the statement.
+    r"(?<!\bme)(?<!\bmyself)\s+and\s+(?=i\b|i'm\b|i've\b|my\b)|"
+    r",\s*(?=(?:recommend|suggest|what|can|show|give)\b)"
 )
 DIET_NAME = r"(vegetarian|vegan|pescatarian|gluten[- ]free|dairy[- ]free)"
 FIRST_PERSON = (
@@ -53,6 +73,21 @@ FIRST_PERSON = (
 def clauses(message: str) -> list[str]:
     text = message.lower().replace("’", "'")
     return [c.strip(" ,") for c in CLAUSE_BREAK.split(text) if c and c.strip(" ,")]
+
+
+def about_someone_else(clause: str) -> bool:
+    """Whether a clause describes another person rather than the customer."""
+    return bool(SOMEONE_ELSE.search(clause)) and not SELF.search(clause)
+
+
+def clause_is_about_someone_else(message: str, quote: str) -> bool:
+    """Judge a quoted fragment by the whole clause it came from."""
+    quote = " ".join(quote.lower().replace("’", "'").split()).strip(" .,!?;")
+    holding = [
+        c for c in clauses(message)
+        if quote in " ".join(c.split()) or " ".join(c.split()) in quote
+    ]
+    return all(about_someone_else(c) for c in holding or [quote])
 
 
 def _items(fragment: str) -> list[str]:
@@ -106,11 +141,30 @@ def _is_food(term: str) -> bool:
     return term in FOODS or term in INGREDIENT_GROUPS or term in ALLERGEN_SYNONYMS
 
 
-def _allergies(clause: str, out: _Extraction) -> bool:
-    if SOMEONE_ELSE.search(clause) and "allerg" in clause:
-        # Another diner's allergy shapes this chat but is not this customer's memory.
-        out.request.avoid.extend(_foods_in(clause))
+def _others_allergies(clause: str, out: _Extraction) -> bool:
+    """Another diner's allergy shapes this chat but is not this customer's memory."""
+    stated = re.search(
+        r"\ballerg(?:ic|y) to (.+)|\bintolerant to (.+)|(?:can't|cannot) (?:eat|have|take) (.+)",
+        clause,
+    )
+    if stated:
+        terms = _items(next(g for g in stated.groups() if g))
+    else:
+        named = re.search(r"\b((?:tree |pine )?[a-z]+) allerg(?:y|ies)\b", clause)
+        terms = [singular(named.group(1))] if named else []
+        terms = [t for t in terms if t not in NOT_ALLERGY_NAMES]
+        if not terms and "allerg" in clause:
+            terms = _foods_in(clause)
+    terms = [t for t in terms if t in ALLERGEN_SYNONYMS or "allerg" in clause]
+    if re.search(r"\bnot allergic\b|n't allergic\b", clause):
         return True
+    out.request.allergies.extend(t for t in terms if t not in NOT_ALLERGY_NAMES)
+    return bool(terms)
+
+
+def _allergies(clause: str, out: _Extraction) -> bool:
+    if about_someone_else(clause):
+        return _others_allergies(clause, out)
     removal = re.search(
         r"(?:not|no longer|n't|never was)\s+(?:actually\s+|really\s+)?allergic to (.+)"
         r"|outgr(?:own|ew) (?:my )?(.+?) allergy"
@@ -128,7 +182,7 @@ def _allergies(clause: str, out: _Extraction) -> bool:
     terms = _items(stated.group(1)) if stated else []
     if not terms:
         named = re.search(r"\b((?:tree |pine )?[a-z]+) allerg(?:y|ies)\b", clause)
-        if named and named.group(1) not in ("an", "a", "my", "food", "any", "have", "no"):
+        if named and named.group(1) not in NOT_ALLERGY_NAMES:
             terms = [singular(named.group(1))]
     for term in terms:
         out.add("allergy", term, clause)
@@ -192,6 +246,14 @@ def _diets(clause: str, out: _Extraction) -> bool:
 
 def _spice_level(clause: str) -> int | None:
     spicy = r"(?:spicy|spice|spiciness|chilli|heat)"
+    # A limit on heat ("nothing too spicy") must not be read as a wish for it.
+    limited = (
+        r"(?:\bnot|\bnothing|n't|\bcannot|\bno|\bhate|\bdislike)\s+(?:\w+\s+){0,2}?"
+        r"(?:too|very|really|overly|super|extremely)\s+(?:spicy|hot)\b"
+        rf"|\btoo (?:spicy|hot) for me\b|\bsensitive to {spicy}\b"
+    )
+    if re.search(limited, clause):
+        return 1
     if re.search(rf"\b(?:no {spicy}|not spicy at all|non[- ]spicy|zero {spicy})\b"
                  rf"|(?:can't|cannot|hate|don't like|dislike|can not) (?:\w+ ){{0,2}}{spicy}",
                  clause):
@@ -212,7 +274,7 @@ def _spice(clause: str, out: _Extraction) -> bool:
         return False
     standing = re.search(
         r"\bi (?:\w+ ){0,2}?(?:like|love|enjoy|prefer|hate|dislike|can't|cannot|don't)\b"
-        r"|\bmy spice\b|\bi'm not (?:a fan|good with)\b", clause,
+        r"|\bmy spice\b|\bi'm (?:not (?:a fan|good with)|sensitive to)\b", clause,
     )
     if standing and not TEMPORARY.search(clause):
         out.add("spice", ("none", "mild", "medium", "hot")[level], clause)

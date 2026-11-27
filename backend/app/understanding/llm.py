@@ -14,7 +14,7 @@ from app.schemas import Understanding
 INSTRUCTION = """You analyse one message from a restaurant customer and return JSON.
 Report only what this message says. Never guess facts about the customer.
 
-preferences: lasting facts about the customer.
+preferences: lasting facts about the customer themselves, never about other people.
 - category: allergy, diet, like, dislike, cuisine, spice or budget.
 - value: a short food term; diet is vegetarian, vegan, pescatarian, gluten_free or
   dairy_free; spice is none, mild, medium or hot; budget is a number in SAR per dish.
@@ -27,6 +27,8 @@ request: what the customer wants right now (not lasting facts).
 - category: starter, main, dessert or drink, only if asked for.
 - wants / avoid: food words. diets: dietary labels asked for in this request.
 - relaxed_diets: diets the customer says not to apply this time.
+- allergies: allergens of OTHER people the customer is ordering for (family, friends,
+  guests, "someone who..."). Never put the customer's own allergies here.
 - max_price: set it whenever any price limit is mentioned (riyals are SAR).
 - spice 0 (none) to 3 (hot), cheaper true for cheaper options.
 

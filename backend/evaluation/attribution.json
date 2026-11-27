@@ -1,0 +1,12 @@
+[
+  {"message": "My neighbour is joining us and sesame makes them very ill", "own": [], "table": ["sesame"]},
+  {"message": "One of our guests has coeliac disease", "own": [], "table": ["gluten"]},
+  {"message": "Please keep peanuts away from the kids, my youngest is allergic", "own": [], "table": ["peanut"]},
+  {"message": "Ordering for my grandma too, she cannot have shellfish", "own": [], "table": ["crustacean", "mollusc"]},
+  {"message": "Would the kunafa be okay for somebody who is allergic to eggs?", "own": [], "table": ["egg"]},
+  {"message": "My boyfriend adores mushrooms", "own": [], "table": []},
+  {"message": "My sister and I are both allergic to fish", "own": ["fish"], "table": []},
+  {"message": "Unlike my brother, I am allergic to mustard", "own": ["mustard"], "table": []},
+  {"message": "My doctor told me I'm allergic to celery", "own": ["celery"], "table": []},
+  {"message": "I have a tree nut allergy and so does my dad", "own": ["tree_nut"], "table": []}
+]

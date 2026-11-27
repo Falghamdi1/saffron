@@ -8,6 +8,26 @@ during the audit unless it is marked **potential risk**. The production Supabase
 was not used for testing. All end-to-end tests ran against throwaway local PostgreSQL
 databases, with the same Gemini model as production.
 
+## Status after remediation
+
+Updated after Phase 1 of [remediation_plan.md](remediation_plan.md). The sections below
+describe the audited commit and are left as written. **The fixes are not yet deployed:** the
+live site still runs the audited behaviour until they are pushed.
+
+| Finding | State | How it was checked |
+| --- | --- | --- |
+| C1 other diners' allergies | Fixed locally | Audit probes re-run with Gemini and rules: no unsafe dish, notice shown, nothing saved |
+| H1 third-person saved as the user's own | Fixed locally for the patterns covered | Same probes; unit tests with mocked wrong model output; gaps listed in LIMITATIONS.md |
+| H2 spice limit lost | Fixed locally | The audit message re-run with Gemini saved a mild spice level; tests |
+| H3 "too spicy" read as hot | Fixed locally | Tests and rules-only probe |
+| M1 stale requests | Fixed locally | Test with a scripted model; probe with Gemini |
+| M2 generic nouns | Fixed locally | Tests; "best lamb dish" with Gemini now returns lamb dishes |
+| H4 Gemini quota | Open | Needs an owner decision |
+| M3 keep-alive | Open | Owner must set `APP_URL` |
+| M4, L2 to L6 | Open | Phase 2 and 3 |
+| Evaluation after the fixes | Measured | 274 tests; 29/29 scenarios with rules and with Gemini (0 of 61 calls fell back); 0 violations in 31,526 sweep recommendations; held-out phrasings 27/30 with Gemini, 13/30 rules; attribution regression set (not held out) 9/10 with Gemini, 7/10 rules (EVALUATION.md) |
+| **New** N1: rules miss "I've become vegetarian", so in fallback mode the diet is not saved or enforced | Open | Found when re-running the audit scenarios with rules only (38 of 44 checks) |
+
 ## 1. Executive summary
 
 The baseline is complete and deployed. The architecture suits the brief: one service,

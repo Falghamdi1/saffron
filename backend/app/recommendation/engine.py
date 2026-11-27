@@ -54,7 +54,7 @@ def build_profile(memory: list[Preference], request: RequestConstraints) -> Prof
     wants = tuple(singular(w) for w in request.wants)
 
     return Profile(
-        allergies=frozenset(values("allergy")),
+        allergies=frozenset(values("allergy") | set(request.allergies)),
         unconfirmed_allergies=frozenset(unconfirmed),
         diets=frozenset(stored_diets | set(request.diets)),
         # Asking for a normally disliked food lifts the dislike for this chat only.

@@ -17,10 +17,12 @@ from pathlib import Path
 import pgserver
 from fastapi.testclient import TestClient
 
+from app.chat import context
 from app.config import ROOT_DIR, Settings
 from app.main import create_app
 from app.memory.policy import normalize
-from app.recommendation.engine import Profile, recommend
+from app.recommendation.engine import Profile, build_profile, recommend
+from app.schemas import RequestConstraints
 from app.setup_db import load_menu_file, setup_database
 from app.understanding.llm import GeminiProvider, LLMError
 from app.understanding.service import understand
@@ -31,6 +33,7 @@ from evaluation.scenarios import SCENARIOS, Context
 SECONDS_BETWEEN_CALLS = 6.5
 REPORT = ROOT_DIR / "docs" / "EVALUATION.md"
 PARAPHRASES = Path(__file__).with_name("paraphrases.json")
+ATTRIBUTION = Path(__file__).with_name("attribution.json")
 
 
 class PacedProvider:
@@ -89,7 +92,47 @@ def constraint_sweep() -> dict:
         violating += sum(
             bool(violations_by_oracle(r.item.id, limits)) for r in result.recommendations
         )
+    # Allergies of other diners arrive through the conversation, not through memory.
+    for allergies in allergy_sets[1:]:
+        profile = build_profile([], RequestConstraints(allergies=list(allergies)))
+        result = recommend(menu, profile, limit=len(menu))
+        limits = Limits(allergens=allergies)
+        profiles += 1
+        recommendations += len(result.recommendations)
+        violating += sum(
+            bool(violations_by_oracle(r.item.id, limits)) for r in result.recommendations
+        )
     return {"profiles": profiles, "recommendations": recommendations, "violations": violating}
+
+
+def attribution_score(provider) -> dict:
+    """Whose statement is it? Others' allergies apply to the chat and are never saved."""
+    cases = json.loads(ATTRIBUTION.read_text(encoding="utf-8"))
+    correct = enforced = expected = wrongly_saved = fallbacks = 0
+    misses = []
+    for case in cases:
+        result, engine = understand(case["message"], provider)
+        fallbacks += engine == "fallback"
+        saved = {
+            (c.category, c.value)
+            for candidate in result.preferences
+            if candidate.scope == "persistent" and candidate.operation == "assert"
+            for c in normalize(candidate)
+        }
+        table = set(context.clean(result.request).allergies)
+        own = {("allergy", value) for value in case["own"]}
+        needed = set(case["own"]) | set(case["table"])
+        expected += len(needed)
+        enforced += len(needed & ({v for c, v in saved if c == "allergy"} | table))
+        wrongly_saved += bool(saved - own)
+        if saved == own and set(case["table"]) <= table:
+            correct += 1
+        else:
+            misses.append(case["message"])
+    return {
+        "cases": len(cases), "correct": correct, "enforced": enforced, "expected": expected,
+        "wrongly_saved": wrongly_saved, "fallbacks": fallbacks, "misses": misses,
+    }
 
 
 def extraction_score(provider) -> dict:
@@ -135,7 +178,7 @@ def percent(part: float, whole: float) -> str:
 
 def render(
     results: list[dict], tally: Tally, sweep: dict, extraction: dict[str, dict],
-    live: dict | None = None,
+    live: dict | None = None, attribution: dict[str, dict] | None = None,
 ) -> str:
     by_area: dict[str, list[dict]] = defaultdict(list)
     for result in results:
@@ -182,7 +225,11 @@ def render(
         "The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It exposed a "
         "safety defect: “sesame seeds” was stored as an unknown allergen, so tahini dishes were "
         "not excluded. Allergen canonicalisation was fixed (and covered by tests), so that one "
-        "case is no longer unseen.",
+        "case is no longer unseen. Later, an audit led to a general rule for statements about "
+        "other people, which also covers the “My colleague loves lamb” case, so that case is "
+        "no longer unseen either. A stop-word added for a related bug (“my allergy” read as an "
+        "allergen) also removed the rules’ one false positive on this set, in “the allergy test "
+        "was negative”, which is why rules precision is higher than in earlier runs.",
         "",
         "| Extractor | Exact match | Precision | Recall | Allergy statements caught |",
         "| --- | --- | --- | --- | --- |",
@@ -201,6 +248,31 @@ def render(
     for name, score in extraction.items():
         if score["misses"]:
             lines += ["", f"Messages {name} got wrong:", ""]
+            lines += [f"- {message}" for message in score["misses"]]
+
+    lines += [
+        "", "## Whose statement is it?", "",
+        "`evaluation/attribution.json` has sentences about other people, or about the customer "
+        "while mentioning others. The same author wrote it just before the attribution patterns, "
+        "and the patterns’ words for other people overlap with it, so it is a regression check, "
+        "not a held-out test. “Enforced” counts allergens applied either from memory or to the "
+        "current chat.",
+        "",
+        "| Extractor | Fully correct | Allergens enforced | Messages saving something wrong |",
+        "| --- | --- | --- | --- |",
+    ]
+    for name, score in (attribution or {}).items():
+        lines.append(
+            f"| {name} | {score['correct']}/{score['cases']} | "
+            f"{score['enforced']}/{score['expected']} | {score['wrongly_saved']} |"
+        )
+        if score["fallbacks"]:
+            lines.append(
+                f"\n{score['fallbacks']} of {score['cases']} model calls failed and used rules."
+            )
+    for name, score in (attribution or {}).items():
+        if score["misses"]:
+            lines += ["", f"Not fully correct with {name}:", ""]
             lines += [f"- {message}" for message in score["misses"]]
 
     if live:
@@ -237,6 +309,7 @@ def main() -> None:
     args = parser.parse_args()
 
     extraction = {"Rules only": extraction_score(None)}
+    attribution = {"Rules only": attribution_score(None)}
     provider = None
     if args.llm:
         configured = Settings()
@@ -245,6 +318,7 @@ def main() -> None:
         model = configured.gemini_model
         provider = PacedProvider(GeminiProvider(configured.gemini_api_key, model))
         extraction[f"Gemini ({model}) + rules"] = extraction_score(provider)
+        attribution[f"Gemini ({model}) + rules"] = attribution_score(provider)
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
         server = pgserver.get_server(directory, cleanup_mode="stop")
@@ -266,7 +340,7 @@ def main() -> None:
         finally:
             server.cleanup()
 
-    report = render(results, tally, constraint_sweep(), extraction, live)
+    report = render(results, tally, constraint_sweep(), extraction, live, attribution)
     REPORT.parent.mkdir(exist_ok=True)
     REPORT.write_text(report, encoding="utf-8", newline="\n")
     print(report)

@@ -48,6 +48,8 @@ class RequestConstraints(BaseModel):
     avoid: list[str] = Field(default_factory=list)
     diets: list[str] = Field(default_factory=list)
     relaxed_diets: list[str] = Field(default_factory=list)
+    # Allergies of other people at the table: enforced in this chat, never remembered.
+    allergies: list[str] = Field(default_factory=list)
     max_price: float | None = Field(default=None, gt=0)
     spice: int | None = Field(default=None, ge=0, le=3)
     cheaper: bool = False

@@ -64,6 +64,7 @@ backend; `/api` is proxied.
 | "I'm not allergic to nuts anymore" | Kept until you press confirm |
 | "I usually like mild food", then "today I want something spicy" | Saved preference unchanged |
 | "I think I might be vegetarian" | Asked, not assumed |
+| "My wife is allergic to sesame. What mains can she have?" | Sesame avoided in this chat; not saved as yours |
 | "Compare butter chicken and chicken vindaloo" | Side-by-side table with conflicts marked |
 | "Do you have sushi?" | Says it is not on the menu |
 
@@ -79,7 +80,7 @@ cd backend
 
 Add `--llm` to also score Gemini (needs a key). Latest measured results are in
 [docs/EVALUATION.md](docs/EVALUATION.md). No hard-constraint violation was found in the
-constraint sweep. On 30 unseen phrasings Gemini matched 26 exactly and the rule-based
+constraint sweep. On 30 held-out phrasings Gemini matched 27 exactly and the rule-based
 fallback 13, so the fallback is a safety net, not a substitute for the model.
 
 ## Layout

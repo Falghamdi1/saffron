@@ -49,6 +49,14 @@ def _reconcile(message: str, model: Understanding, baseline: Understanding) -> U
         if c.category != "favorite_dish" and c.evidence and _squash(c.evidence) in source
     ]
 
+    # Statements about other people never become the customer's memory. Their allergies
+    # still apply to this conversation.
+    others = [c for c in preferences if rules.clause_is_about_someone_else(message, c.evidence)]
+    preferences = [c for c in preferences if c not in others]
+    table = [
+        c.value for c in others if c.category == "allergy" and c.operation == "assert"
+    ]
+
     # The model tends to read "I don't eat much meat" as a firm dislike.
     for candidate in preferences:
         wording = _squash(candidate.evidence)
@@ -66,8 +74,15 @@ def _reconcile(message: str, model: Understanding, baseline: Understanding) -> U
         c for c in baseline.preferences
         if c.category == "allergy" and c.operation == "assert" and not _keys(c) <= seen
     ]
+    # The model often loses negated spice wording ("I can't handle very spicy food").
+    if not any(c.category == "spice" and c.operation == "assert" for c in preferences):
+        stated = [c for c in baseline.preferences if c.category == "spice"]
+        if stated:
+            preferences = [c for c in preferences if c.category != "spice"] + stated
     # A price limit is a hard constraint, so one the model overlooked is restored.
-    request = model.request
+    request = model.request.model_copy(update={
+        "allergies": [*model.request.allergies, *baseline.request.allergies, *table]
+    })
     if request.max_price is None and not any(c.category == "budget" for c in preferences):
         request = request.model_copy(update={"max_price": baseline.request.max_price})
     return model.model_copy(update={"preferences": preferences, "request": request})

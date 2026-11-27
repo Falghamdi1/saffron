@@ -330,3 +330,35 @@ def model_failure(ctx: Context) -> None:
         expect(reply["payload"]["engine"] == "fallback", "no fallback flag")
         expect(bool(picks(reply)), "no recommendations")
         ctx.tally.check(reply, Limits(allergens=("fish",)))
+
+
+# --- Other people at the table, and request carry-over ------------------------
+
+
+@scenario("constraints", "Another diner's allergy filters the chat but is not remembered")
+def table_allergy(ctx: Context) -> None:
+    diner = ctx.diner()
+    limits = Limits(allergens=("sesame",))
+    first = diner.say("My wife is allergic to sesame. What mains can she have?")
+    expect(bool(picks(first)), "no picks")
+    ctx.tally.check(first, limits)
+    expect("sesame" in first["payload"]["notice"], "no safety notice")
+    for request in ("any starters?", "recommend a main"):
+        ctx.tally.check(diner.say(request), limits)
+    expect(diner.memory() == {"preferences": [], "history": []}, f"saved {diner.memory()}")
+
+
+@scenario("memory", "Asking about someone else's allergy saves nothing")
+def third_person_question(ctx: Context) -> None:
+    diner = ctx.diner()
+    reply = diner.say("Is the hummus safe for someone with a sesame allergy?")
+    expect("contains sesame" in reply["content"], reply["content"])
+    expect(diner.memory() == {"preferences": [], "history": []}, "saved to the user")
+
+
+@scenario("quality", "An earlier dish question does not shape later requests")
+def no_stale_request(ctx: Context) -> None:
+    diner = ctx.diner()
+    diner.say("Can I have the pistachio ice cream?")
+    reply = diner.say("recommend a dessert")
+    expect("couldn't find" not in reply["content"], reply["content"])

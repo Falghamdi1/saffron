@@ -8,13 +8,13 @@ Run on 2026-11-27, Python 3.11.9, PostgreSQL via pgserver.
 
 | Measure | Result |
 | --- | --- |
-| End-to-end scenarios passed | 26/26 |
-| Hard-constraint violations, constraint sweep | 0 of 30,004 recommendations over 8,280 profiles |
-| Hard-constraint violations, scenarios | 0 of 47 recommendations |
-| Memory retrieval scenarios | 2/2 (100.0%) |
+| End-to-end scenarios passed | 29/29 |
+| Hard-constraint violations, constraint sweep | 0 of 31,526 recommendations over 8,371 profiles |
+| Hard-constraint violations, scenarios | 0 of 56 recommendations |
+| Memory retrieval scenarios | 3/3 (100.0%) |
 | Preference update scenarios | 7/7 (100.0%) |
 | Cross-user isolation scenarios | 2/2 (100.0%) |
-| Recommendation quality scenarios (expected results) | 4/4 (100.0%) |
+| Recommendation quality scenarios (expected results) | 5/5 (100.0%) |
 
 The table above and the sweep use the deterministic rule extractor, so they measure memory, filtering, ranking and access control, not language understanding. The scenarios were written by the same author as the code; they are regression evidence, not an independent benchmark.
 
@@ -22,12 +22,12 @@ The table above and the sweep use the deterministic rule extractor, so they meas
 
 `evaluation/paraphrases.json` holds messages written without consulting the extraction patterns, and no pattern has been added to match them.
 
-The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It exposed a safety defect: “sesame seeds” was stored as an unknown allergen, so tahini dishes were not excluded. Allergen canonicalisation was fixed (and covered by tests), so that one case is no longer unseen.
+The first run scored 12/30 exact, 25% recall and 2/5 allergy statements. It exposed a safety defect: “sesame seeds” was stored as an unknown allergen, so tahini dishes were not excluded. Allergen canonicalisation was fixed (and covered by tests), so that one case is no longer unseen. Later, an audit led to a general rule for statements about other people, which also covers the “My colleague loves lamb” case, so that case is no longer unseen either. A stop-word added for a related bug (“my allergy” read as an allergen) also removed the rules’ one false positive on this set, in “the allergy test was negative”, which is why rules precision is higher than in earlier runs.
 
 | Extractor | Exact match | Precision | Recall | Allergy statements caught |
 | --- | --- | --- | --- | --- |
-| Rules only | 13/30 | 88% | 29% | 3/5 |
-| Gemini (gemini-3.5-flash-lite) + rules | 26/30 | 85% | 96% | 5/5 |
+| Rules only | 13/30 | 100% | 29% | 3/5 |
+| Gemini (gemini-3.5-flash-lite) + rules | 27/30 | 85% | 96% | 5/5 |
 
 Messages Rules only got wrong:
 
@@ -51,14 +51,32 @@ Messages Rules only got wrong:
 
 Messages Gemini (gemini-3.5-flash-lite) + rules got wrong:
 
+- Meat is off the table for me, and fish too
 - I've started eating fish but still no meat
-- Gulf food is what I love most
-- Turns out I'm fine with eggs, the allergy test was negative
-- My colleague loves lamb, what would you suggest for them?
+- I used to enjoy mushrooms, not these days
+
+## Whose statement is it?
+
+`evaluation/attribution.json` has sentences about other people, or about the customer while mentioning others. The same author wrote it just before the attribution patterns, and the patterns’ words for other people overlap with it, so it is a regression check, not a held-out test. “Enforced” counts allergens applied either from memory or to the current chat.
+
+| Extractor | Fully correct | Allergens enforced | Messages saving something wrong |
+| --- | --- | --- | --- |
+| Rules only | 7/10 | 7/10 | 0 |
+| Gemini (gemini-3.5-flash-lite) + rules | 9/10 | 9/10 | 0 |
+
+Not fully correct with Rules only:
+
+- My neighbour is joining us and sesame makes them very ill
+- One of our guests has coeliac disease
+- Please keep peanuts away from the kids, my youngest is allergic
+
+Not fully correct with Gemini (gemini-3.5-flash-lite) + rules:
+
+- One of our guests has coeliac disease
 
 ## Scenarios with Gemini
 
-26/26 scenarios passed with gemini-3.5-flash-lite reading messages. 0 of 55 model calls failed and used rules. Hard-constraint violations: 0 of 47 recommendations.
+29/29 scenarios passed with gemini-3.5-flash-lite reading messages. 0 of 61 model calls failed and used rules. Hard-constraint violations: 0 of 56 recommendations.
 
 The first live run passed 23/26. It showed a hedged statement (“I don't eat much meat”) stored as a firm dislike, and “Do you have sushi?” not saying that sushi is not served; both were fixed. The third failure was a scenario that accepted only one of two correct history events, and the scenario was corrected.
 
@@ -92,3 +110,6 @@ The first live run passed 23/26. It showed a hedged statement (“I don't eat mu
 | robustness | Unavailable dishes are never recommended | Pass |
 | robustness | A dish that does not exist is not invented | Pass |
 | robustness | A model outage falls back to rules and keeps allergies safe | Pass |
+| constraints | Another diner's allergy filters the chat but is not remembered | Pass |
+| memory | Asking about someone else's allergy saves nothing | Pass |
+| quality | An earlier dish question does not shape later requests | Pass |

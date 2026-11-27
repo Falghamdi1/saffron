@@ -5,7 +5,9 @@ import json
 import httpx
 import pytest
 
-from app.schemas import Candidate, Understanding
+from app.chat import context
+from app.memory.policy import normalize
+from app.schemas import Candidate, RequestConstraints, Understanding
 from app.understanding.llm import GeminiProvider, LLMError, response_schema
 from app.understanding.rules import understand as rules
 from app.understanding.service import understand
@@ -186,3 +188,103 @@ def test_a_brief_overload_is_retried_once():
         return reply_with({"intent": "greeting"})(request)
 
     assert gemini(handler).understand("hi").intent == "greeting"
+
+
+@pytest.mark.parametrize(("message", "allergens"), [
+    ("My wife is allergic to sesame. What mains can she have?", {"sesame"}),
+    ("My friend has a peanut allergy, do you have any lamb dishes?", {"peanut"}),
+    ("Is the hummus safe for someone with a sesame allergy?", {"sesame"}),
+    ("My daughter is allergic to dairy, which desserts are ok?", {"milk"}),
+    ("My son is 5. He can't eat eggs", {"egg"}),
+])
+def test_another_diners_allergy_applies_to_the_chat_not_to_memory(message, allergens):
+    result = rules(message)
+    assert [c for c in result.preferences if c.category == "allergy"] == []
+    cleaned = context.clean(result.request)
+    assert set(cleaned.allergies) == allergens
+
+
+@pytest.mark.parametrize("message", [
+    "I'm allergic to peanuts and my wife loves lamb",
+    "My friend and I are allergic to peanuts",
+    "Like my dad, I'm allergic to peanuts",
+    "I have a peanut allergy, same as my son",
+])
+def test_the_users_own_allergy_is_still_remembered(message):
+    result = rules(message)
+    assert ("allergy", "peanut") in {(c.category, c.value) for c in result.preferences}
+
+
+@pytest.mark.parametrize(("message", "evidence"), [
+    ("My son is allergic to peanuts, what desserts are safe?", "allergic to peanuts"),
+    ("Is this ok for someone with a peanut allergy?", "peanut allergy"),
+])
+def test_model_cannot_save_another_persons_allergy(message, evidence):
+    wrong = Understanding(preferences=[
+        Candidate(category="allergy", value="peanuts", evidence=evidence)
+    ])
+    result, _ = understand(message, FakeProvider(wrong))
+    assert result.preferences == []
+    assert context.clean(result.request).allergies == ["peanut"]
+
+
+def test_model_cannot_save_another_persons_taste():
+    wrong = Understanding(preferences=[
+        Candidate(category="like", value="lamb", evidence="loves lamb")
+    ])
+    result, _ = understand("My colleague loves lamb", FakeProvider(wrong))
+    assert result.preferences == []
+
+
+@pytest.mark.parametrize(("message", "level"), [
+    ("Nothing too spicy for me please", 1),
+    ("not too hot please", 1),
+    ("nothing very spicy", 1),
+])
+def test_limits_on_heat_are_not_read_as_wanting_heat(message, level):
+    assert rules(message).request.spice == level
+
+
+@pytest.mark.parametrize("message", [
+    "I can't handle very spicy food", "I'm sensitive to heat", "I don't like very spicy food",
+])
+def test_limited_spice_tolerance_is_remembered_as_mild(message):
+    assert ("spice", "mild", "assert", "persistent", "explicit") in found(message)
+
+
+@pytest.mark.parametrize("model", [
+    Understanding(preferences=[Candidate(
+        category="dislike", value="very spicy food", evidence="can't handle very spicy food"
+    )]),
+    Understanding(preferences=[Candidate(
+        category="spice", value="hot", operation="retract",
+        evidence="can't handle very spicy food",
+    )]),
+    Understanding(),
+])
+def test_spice_limit_lost_by_the_model_is_restored(model):
+    result, _ = understand("I can't handle very spicy food", FakeProvider(model))
+    kept = [
+        (c.category, c.value) for p in result.preferences for c in normalize(p)
+        if c.operation == "assert"
+    ]
+    assert kept == [("spice", "mild")]
+
+
+@pytest.mark.parametrize(("term", "cleaned"), [
+    ("lamb dish", ["lamb"]), ("chicken options", ["chicken"]), ("food", []),
+])
+def test_generic_nouns_are_not_searched_for(term, cleaned):
+    assert context.clean(RequestConstraints(wants=[term])).wants == cleaned
+
+
+@pytest.mark.parametrize("message", [
+    "Me and my son are allergic to milk", "Myself and my wife are allergic to milk",
+])
+def test_an_allergy_shared_with_the_customer_is_remembered(message):
+    assert ("allergy", "milk") in {(c.category, c.value) for c in rules(message).preferences}
+
+
+def test_a_possessive_is_not_mistaken_for_an_allergen():
+    result = rules("my allergy is peanuts, tell my friend")
+    assert context.clean(result.request).allergies == ["peanut"]
