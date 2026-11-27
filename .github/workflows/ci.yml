@@ -20,7 +20,14 @@ jobs:
           python-version: "3.11"
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
-      - run: pytest -q
+      # Failed runs repeat the errors as annotations, readable without opening the log.
+      - run: |
+          set -o pipefail
+          pytest -q --tb=short 2>&1 | tee pytest.log || {
+            summary=$(grep -E '^(FAILED|ERROR|E )' pytest.log | head -n 30 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=pytest::$summary"
+            exit 1
+          }
 
   image:
     runs-on: ubuntu-latest
