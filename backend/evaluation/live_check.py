@@ -76,6 +76,24 @@ def run(client: httpx.Client) -> list[tuple[str, bool]]:
     check("test preference removed", client.delete(
         f"/api/memory/{sesame['id']}", headers=first
     ).is_success)
+
+    # Compare before and after: this account may already hold preferences.
+    before = client.get("/api/memory", headers=second).json()["preferences"]
+    asked = client.post(
+        "/api/chat", headers=second,
+        json={"message": "My wife is allergic to sesame. What mains can she have?"},
+    )
+    asked.raise_for_status()
+    answer = asked.json()["message"]["payload"]
+    check(
+        "another diner's allergy is enforced in the chat",
+        bool(answer["recommendations"]) and "sesame" in answer["notice"] and all(
+            "sesame" not in p["item"]["allergens"] + p["item"]["may_contain"]
+            for p in answer["recommendations"]
+        ),
+    )
+    after = client.get("/api/memory", headers=second).json()["preferences"]
+    check("another diner's allergy is not saved to the user", after == before)
     return results
 
 

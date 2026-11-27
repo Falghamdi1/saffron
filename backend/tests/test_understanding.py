@@ -288,3 +288,24 @@ def test_an_allergy_shared_with_the_customer_is_remembered(message):
 def test_a_possessive_is_not_mistaken_for_an_allergen():
     result = rules("my allergy is peanuts, tell my friend")
     assert context.clean(result.request).allergies == ["peanut"]
+
+
+@pytest.mark.parametrize(("message", "allergen"), [
+    ("As someone with a nut allergy, what can I eat?", "nut"),
+    ("I'm a person who can't eat gluten", "gluten"),
+    ("I'm someone who's allergic to sesame", "sesame"),
+])
+def test_a_self_description_is_remembered(message, allergen):
+    result = rules(message)
+    assert ("allergy", allergen) in {(c.category, c.value) for c in result.preferences}
+    assert result.request.allergies == []
+
+
+def test_a_self_description_quoted_by_the_model_is_kept():
+    message = "As someone with a nut allergy, what can I eat?"
+    right = Understanding(preferences=[
+        Candidate(category="allergy", value="nuts", evidence="As someone with a nut allergy")
+    ])
+    result, _ = understand(message, FakeProvider(right))
+    assert "nuts" in [c.value for c in result.preferences]
+    assert result.request.allergies == []

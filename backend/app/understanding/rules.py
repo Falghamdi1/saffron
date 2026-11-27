@@ -42,6 +42,8 @@ SELF = re.compile(
     r"hate|dislike|can't|cannot|don't|vegetarian|vegan|pescatarian)\b"
     r"|\bi (?:also )?have (?:a |an )?(?:[a-z]+ ){1,2}allerg"
     r"|\b(?:so am i|me too|me and|and me|and i|myself and|and myself)\b"
+    # "As someone with a nut allergy" is the customer describing themselves.
+    r"|\b(?:as|i'm|im|i am) (?:someone|somebody|a person)\b"
 )
 SPICY_WORDS = ("spicy", "spice", "spiciness", "heat", "hot food", "hot dishes")
 
@@ -192,7 +194,11 @@ def _allergies(clause: str, out: _Extraction) -> bool:
     if re.search(r"\blactose[- ]intolerant\b", clause):
         out.add("diet", "dairy_free", clause)
         return True
-    cannot = re.search(r"\bi (?:can't|cannot|can not|shouldn't) (?:eat|have|take) (.+)", clause)
+    cannot = re.search(
+        r"\b(?:i|(?:someone|somebody|a person) who) (?:can't|cannot|can not|shouldn't) "
+        r"(?:eat|have|take) (.+)",
+        clause,
+    )
     intolerant = re.search(r"\bintolerant to (.+)", clause)
     match = cannot or intolerant
     if match and not TEMPORARY.search(clause):
