@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+node_modules/
+dist/
+.localdb/
+# Assignment brief is not part of the submission
+AI_Engineer_Take_Home_Assignment__1_.pdf

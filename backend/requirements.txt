@@ -1,0 +1,7 @@
+fastapi~=0.165
+uvicorn[standard]~=0.54
+pydantic~=2.14
+pydantic-settings~=2.16
+psycopg[binary,pool]~=3.3
+pyjwt[crypto]~=2.15
+httpx~=0.29
