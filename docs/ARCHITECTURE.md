@@ -42,7 +42,8 @@ Gemini returns JSON against a schema, validated by Pydantic. Three safeguards ap
 the policy sees it:
 
 - A preference must quote words that appear in the message, otherwise it is dropped.
-- Allergy statements found by the rules are added even if the model missed them.
+- Allergy statements and price limits found by the rules are added if the model missed
+  them. A live Gemini call dropped a price limit, which prompted the second part.
 - A hedged diet statement cannot be upgraded to certain by the model.
 
 Any HTTP error, timeout or invalid response falls back to the rules, and the interface says

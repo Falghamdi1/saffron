@@ -1,7 +1,8 @@
 """Combine the language model with deterministic extraction.
 
 The model handles varied phrasing. The rules guarantee that a clearly stated
-allergy is not lost if the model misses it, and take over entirely if it fails.
+allergy or price limit is not lost if the model misses it, and take over entirely
+if it fails.
 """
 
 import logging
@@ -58,4 +59,8 @@ def _reconcile(message: str, model: Understanding, baseline: Understanding) -> U
         c for c in baseline.preferences
         if c.category == "allergy" and c.operation == "assert" and not _keys(c) <= seen
     ]
-    return model.model_copy(update={"preferences": preferences})
+    # A price limit is a hard constraint, so one the model overlooked is restored.
+    request = model.request
+    if request.max_price is None and not any(c.category == "budget" for c in preferences):
+        request = request.model_copy(update={"max_price": baseline.request.max_price})
+    return model.model_copy(update={"preferences": preferences, "request": request})

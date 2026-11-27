@@ -27,7 +27,8 @@ request: what the customer wants right now (not lasting facts).
 - category: starter, main, dessert or drink, only if asked for.
 - wants / avoid: food words. diets: dietary labels asked for in this request.
 - relaxed_diets: diets the customer says not to apply this time.
-- max_price in SAR, spice 0 (none) to 3 (hot), cheaper true for cheaper options.
+- max_price: set it whenever any price limit is mentioned (riyals are SAR).
+- spice 0 (none) to 3 (hot), cheaper true for cheaper options.
 
 intent: recommend, compare, dish_question, share, greeting or other.
 dish_names: names of specific dishes the customer asks about, as they wrote them.

@@ -150,3 +150,8 @@ def test_gemini_schema_uses_only_the_documented_subset():
 
 def test_zero_budget_from_a_model_means_no_budget():
     assert Understanding(request={"max_price": 0}).request.max_price is None
+
+
+def test_price_limit_missed_by_the_model_is_restored():
+    result, _ = understand("dinner under 60 riyals", FakeProvider(Understanding()))
+    assert result.request.max_price == 60
