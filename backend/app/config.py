@@ -4,15 +4,32 @@ import re
 import secrets
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlparse
 
+from psycopg import ProgrammingError
+from psycopg.conninfo import conninfo_to_dict
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 ROOT_DIR = BACKEND_DIR.parent
-LOOPBACK = ("localhost", "127.0.0.1")
+LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 BRACKETED_CREDENTIALS = re.compile(r"://[^@/]*[\[\]][^@/]*@")
+
+
+def is_local_database(url: str) -> bool:
+    """True only if libpq would connect to this machine: loopback or a Unix socket."""
+    try:
+        # Read the URL as libpq does, so ?host= and ?hostaddr= overrides are seen.
+        parts = conninfo_to_dict(url)
+    except ProgrammingError:
+        return False
+    hosts = str(parts.get("host") or "").split(",")
+    address = parts.get("hostaddr")
+    return (
+        "service" not in parts
+        and (address is None or address in LOOPBACK)
+        and all(host in LOOPBACK or host.startswith("/") for host in hosts)
+    )
 
 
 class Settings(BaseSettings):
@@ -46,6 +63,6 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"Supabase mode requires: {', '.join(missing).upper()}")
         # Local sign-in has no passwords, so it must never front a remote database.
-        elif self.database_url and urlparse(self.database_url).hostname not in LOOPBACK:
+        elif self.database_url and not is_local_database(self.database_url):
             raise ValueError("AUTH_MODE=local only works with a database on this machine")
         return self

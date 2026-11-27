@@ -39,9 +39,25 @@ def test_forged_and_expired_tokens_are_rejected(client, settings):
         assert response.status_code == 401
 
 
-def test_local_sign_in_refuses_a_remote_database():
+@pytest.mark.parametrize("url", [
+    "postgresql://u:p@db.example.com/x",
+    "postgresql://u:p@localhost/x?host=db.example.com",
+    "postgresql://u:p@localhost/x?hostaddr=203.0.113.5",
+    "postgresql://u:p@localhost,db.example.com/x",
+    "postgresql:///x",
+    "not a url",
+])
+def test_local_sign_in_refuses_a_remote_database(url):
     with pytest.raises(ValueError, match="only works with a database on this machine"):
-        Settings(_env_file=None, auth_mode="local", database_url="postgresql://u:p@db.example.com/x")
+        Settings(_env_file=None, auth_mode="local", database_url=url)
+
+
+@pytest.mark.parametrize("url", [
+    "postgresql://postgres:@127.0.0.1:5432/postgres",
+    "postgresql://postgres:@/postgres?host=/tmp/pg",  # pgserver on Linux and macOS
+])
+def test_local_sign_in_accepts_a_database_on_this_machine(url):
+    assert Settings(_env_file=None, auth_mode="local", database_url=url).database_url == url
 
 
 def test_blank_and_oversized_messages_are_rejected(diner):
