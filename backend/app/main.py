@@ -1,6 +1,8 @@
 """Application factory. Run with: uvicorn app.main:create_app --factory"""
 
 import logging
+import subprocess
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +16,7 @@ from app.rate_limit import RateLimiter
 from app.setup_db import setup_database
 from app.understanding.llm import GeminiProvider, UnderstandingProvider
 
+logger = logging.getLogger(__name__)
 FRONTEND_DIST = ROOT_DIR / "frontend" / "dist"
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -26,7 +29,16 @@ def _embedded_database() -> str:
     """Local mode without DATABASE_URL: run a private PostgreSQL in .localdb/."""
     import pgserver
 
-    server = pgserver.get_server(ROOT_DIR / ".localdb", cleanup_mode="stop")
+    # After a force-killed run, crash recovery can outlast pgserver's start timeout.
+    for attempt in range(1, 5):
+        try:
+            server = pgserver.get_server(ROOT_DIR / ".localdb", cleanup_mode="stop")
+            break
+        except subprocess.TimeoutExpired:
+            if attempt == 4:
+                raise
+            logger.warning("Local database is still recovering, retrying")
+            time.sleep(15)
     url = server.get_uri()
     setup_database(url, local=True)
     return url
