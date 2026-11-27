@@ -69,3 +69,10 @@ def test_passwordless_sign_in_does_not_exist_in_production(database_url):
         response = client.post("/api/local-auth/session", json={"name": "anyone"})
         assert response.status_code == 404
         assert client.get("/api/config").json()["auth_mode"] == "supabase"
+
+
+def test_configuration_errors_never_echo_secrets():
+    url = "postgresql://postgres.ref:[Sup3rSecret]@pooler.supabase.com:5432/postgres"
+    with pytest.raises(ValueError, match="remove the") as error:
+        supabase_settings(url)
+    assert "Sup3rSecret" not in str(error.value)

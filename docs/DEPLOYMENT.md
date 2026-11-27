@@ -12,6 +12,7 @@ Check current free-tier terms before relying on them: they change.
    can register without a mailbox round trip.
 3. From **Connect**, copy the **Session pooler** connection string (Render's free tier has
    no IPv6, so the direct connection will not work). Append `?sslmode=require`.
+   Replace `[YOUR-PASSWORD]` including the square brackets.
 4. From **Project Settings**, copy the project URL and the **publishable** (anon) key.
    If the project still uses a legacy HS256 JWT secret, copy that too.
 

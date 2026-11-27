@@ -1,5 +1,6 @@
 """Runtime configuration, read from environment variables or a local .env file."""
 
+import re
 import secrets
 from pathlib import Path
 from typing import Literal
@@ -11,10 +12,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 ROOT_DIR = BACKEND_DIR.parent
 LOOPBACK = ("localhost", "127.0.0.1")
+BRACKETED_CREDENTIALS = re.compile(r"://[^@/]*[\[\]][^@/]*@")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", extra="ignore")
+    # Validation errors must never echo configuration values, which include secrets.
+    model_config = SettingsConfigDict(
+        env_file=ROOT_DIR / ".env", extra="ignore", hide_input_in_errors=True
+    )
 
     auth_mode: Literal["supabase", "local"] = "local"
     database_url: str = ""
@@ -29,6 +34,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def check_auth_mode(self) -> "Settings":
+        # The Supabase dashboard shows the password as [YOUR-PASSWORD]; brackets left in
+        # place make URL parsers fail with messages that quote the password.
+        if BRACKETED_CREDENTIALS.search(self.database_url):
+            raise ValueError("DATABASE_URL: remove the [ ] around the password")
         if self.auth_mode == "supabase":
             missing = [
                 name for name in ("database_url", "supabase_url", "supabase_anon_key")
