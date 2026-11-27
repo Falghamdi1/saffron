@@ -309,3 +309,25 @@ def test_a_self_description_quoted_by_the_model_is_kept():
     result, _ = understand(message, FakeProvider(right))
     assert "nuts" in [c.value for c in result.preferences]
     assert result.request.allergies == []
+
+
+@pytest.mark.parametrize(("message", "expected"), [
+    ("I've become vegetarian", ("diet", "vegetarian")),
+    ("I have become vegan", ("diet", "vegan")),
+    ("I turned pescatarian last month", ("diet", "pescatarian")),
+    ("Actually, I can handle medium spice now", ("spice", "medium")),
+    ("I can only handle mild food", ("spice", "mild")),
+])
+def test_rules_notice_a_change_of_diet_or_spice(message, expected):
+    assert (*expected, "assert", "persistent", "explicit") in found(message)
+
+
+@pytest.mark.parametrize("message", [
+    "I want to become vegetarian one day", "What spicy dishes can I eat?",
+    "Today I can handle medium spice",
+])
+def test_rules_do_not_save_a_wish_a_question_or_a_one_off(message):
+    assert not [
+        c for c in rules(message).preferences
+        if c.category in ("diet", "spice") and c.scope == "persistent"
+    ]

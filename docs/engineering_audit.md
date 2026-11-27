@@ -27,10 +27,10 @@ conversations and isolation; the other fixes were verified locally, not on the l
 | H4 Gemini quota | Open | Needs an owner decision |
 | M3 keep-alive | Open | Owner must set `APP_URL` |
 | M4, L2 to L6 | Open | Phase 2 and 3 |
-| Evaluation after the fixes | Measured | 278 tests; 29/29 scenarios with rules and with Gemini (0 of 61 calls fell back); 0 violations in 31,526 sweep recommendations; held-out phrasings 27/30 with Gemini, 13/30 rules; attribution regression set (not held out) 9/10 with Gemini, 7/10 rules (EVALUATION.md) |
-| N1: rules miss “I've become vegetarian” and “I can handle medium spice now”, so in fallback mode these changes are not saved | Open; present before Phase 1, found on re-test | Audit scenarios with rules only |
+| Evaluation after the fixes | Measured | 286 tests; 29/29 scenarios with rules and with Gemini (0 of 61 calls fell back); 0 violations in 31,526 sweep recommendations; held-out phrasings 27/30 with Gemini, 13/30 rules; attribution regression set (not held out) 9/10 with Gemini, 7/10 rules (EVALUATION.md) |
+| N1: rules missed “I've become vegetarian” and “I can handle medium spice now” | Fixed (present before Phase 1, found on re-test) | Tests; rules scores unchanged; no held-out sentence uses this wording |
 | Review of the fixes: “As someone with a nut allergy…” was treated as being about another person | Introduced by Phase 1, fixed before release | Tests with rules and mocked model output. Made after the Gemini evaluation run; rules scores re-checked and unchanged |
-| Audit scenarios, rules only | 39/44 before, 38/44 after | The one new failure: “can't handle very spicy food” is now saved as mild rather than none, so a medium-spice lamb dish can appear third |
+| Audit scenarios, rules only | 39/44 before Phase 1, 38/44 after it, 42/44 after N1 | Remaining: a budget from earlier in the chat still applies (script error), and a medium-spice lamb dish can appear third for a mild preference |
 
 ## 1. Executive summary
 

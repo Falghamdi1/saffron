@@ -68,7 +68,7 @@ CLAUSE_BREAK = re.compile(
 DIET_NAME = r"(vegetarian|vegan|pescatarian|gluten[- ]free|dairy[- ]free)"
 FIRST_PERSON = (
     r"\b(?:i am|i'm|im|i've been|i have been|i've gone|i went|i became|"
-    r"i might be|i may be|we are|we're)\b"
+    r"i've become|i have become|i've turned|i turned|i might be|i may be|we are|we're)\b"
 )
 
 
@@ -280,7 +280,9 @@ def _spice(clause: str, out: _Extraction) -> bool:
         return False
     standing = re.search(
         r"\bi (?:\w+ ){0,2}?(?:like|love|enjoy|prefer|hate|dislike|can't|cannot|don't)\b"
-        r"|\bmy spice\b|\bi'm (?:not (?:a fan|good with)|sensitive to)\b", clause,
+        r"|\bmy spice\b|\bi'm (?:not (?:a fan|good with)|sensitive to)\b"
+        r"|\bi can (?:now |only )?(?:handle|take|eat|do) (?:medium|mild|very spicy|really spicy)\b",
+        clause,
     )
     if standing and not TEMPORARY.search(clause):
         out.add("spice", ("none", "mild", "medium", "hot")[level], clause)

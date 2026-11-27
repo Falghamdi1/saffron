@@ -20,8 +20,7 @@
   - ways of agreeing such as "so do I", "neither can I" or "same here" are not recognised,
     so a shared allergy phrased that way is not saved to the customer's profile;
   - without Gemini, indirect phrasings ("sesame makes them very ill") are not caught at all.
-- Without Gemini, some diet and spice changes are missed ("I've become vegetarian",
-  "I can handle medium spice now").
+- Without Gemini, only common wordings of a diet or spice change are recognised.
 
 ## Behaviour
 
