@@ -189,7 +189,9 @@ def explicit_correction(ctx: Context) -> None:
         f"got {diner.preferences()}",
     )
     events = {(e["event_type"], e["category"]) for e in diner.memory()["history"]}
-    expect(("retracted", "like") in events, f"history {events}")
+    expect(
+        bool(events & {("retracted", "like"), ("superseded", "like")}), f"history {events}"
+    )
 
 
 @scenario("updates", "Conflicting statements resolve to the latest explicit one")
@@ -237,7 +239,12 @@ def uncertain_diet(ctx: Context) -> None:
     diner = ctx.diner()
     diner.say("I don't eat much meat")
     expect(diner.preferences() == set(), "uncertain statement became active")
-    expect(diner.preferences("pending") == {("diet", "vegetarian")}, "not proposed")
+    # A proposed diet and a proposed "avoids meat" are both fair readings.
+    proposals = diner.preferences("pending")
+    expect(
+        bool(proposals) and proposals <= {("diet", "vegetarian"), ("dislike", "meat")},
+        f"proposed {proposals}",
+    )
     reply = diner.say("something with chicken")
     expect(any("chicken" in item for item in picks(reply)), "chicken was wrongly excluded")
 

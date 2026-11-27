@@ -35,6 +35,10 @@ HEDGE = re.compile(
     r"\b(i think|i might|maybe|possibly|probably|not sure|not certain|i guess|might be|"
     r"may be|i suspect|sometimes|mostly|trying to|try to|kind of|sort of|i wonder)\b"
 )
+# Softened wording ("not much", "rarely") that should not become a firm rule.
+SOFTENED = re.compile(
+    r"(?:\bnot|n't) (?:\w+ ){0,2}(?:much|often|really)\b|\brarely\b|\bnot a lot of\b"
+)
 CLAUSE_BREAK = re.compile(
     r"[.!?;\n]+|,?\s+\b(?:but|although|though|however)\b\s+|,\s*(?=i\b|i'm\b|my\b)|"
     r"\s+and\s+(?=i\b|i'm\b|i've\b|my\b)|,\s*(?=(?:recommend|suggest|what|can|show|give)\b)"

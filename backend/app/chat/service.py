@@ -22,6 +22,7 @@ from app.schemas import (
 )
 from app.understanding.llm import UnderstandingProvider
 from app.understanding.service import understand
+from app.vocabulary import singular
 
 
 class ConversationNotFound(Exception):
@@ -135,14 +136,12 @@ def _respond(
         ))
 
     unknown = ""
-    if intent == "dish_question" and understanding.request == RequestConstraints():
-        names = [
-            n for n in understanding.dish_names
-            if not set(n.lower().split()) & dishes.NOT_DISH_NAMES
-            and not any(matches_food(item, n) for item in menu)
-        ]
-        if names:
-            unknown = reply.unknown_dish(names[0][:60]) + " These are on the menu instead."
+    missing = _unknown_dishes(understanding, menu) if intent == "dish_question" else []
+    if missing:
+        unknown = reply.unknown_dish(missing[0][:60]) + " These are on the menu instead."
+        # Do not keep searching for something the kitchen does not make.
+        request.wants = [w for w in request.wants if singular(w) not in map(singular, missing)]
+        profile = build_profile(memory, request)
 
     refresh_after_change = intent == "share" and shown and notes
     if not (intent in ("recommend", "dish_question") or refresh_after_change):
@@ -172,3 +171,19 @@ def _respond(
         recommendations=result.recommendations,
         shown=[r.item.id for r in result.recommendations],
     ))
+
+
+def _unknown_dishes(understanding: Understanding, menu: list[MenuItem]) -> list[str]:
+    """Dish names the user asked for that match nothing the kitchen makes."""
+    names = [
+        name for name in understanding.dish_names
+        if not set(name.lower().split()) & dishes.NOT_DISH_NAMES
+        and not any(matches_food(item, name) for item in menu)
+    ]
+    # "Do you have vegan desserts?" is a filtered request, not a missing dish. A model
+    # may also list the unknown dish as a wanted food, which does not count.
+    asked = {singular(name) for name in names}
+    other = understanding.request.model_copy(update={
+        "wants": [w for w in understanding.request.wants if singular(w) not in asked]
+    })
+    return names if other == RequestConstraints() else []

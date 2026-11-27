@@ -49,6 +49,13 @@ def _reconcile(message: str, model: Understanding, baseline: Understanding) -> U
         if c.category != "favorite_dish" and c.evidence and _squash(c.evidence) in source
     ]
 
+    # The model tends to read "I don't eat much meat" as a firm dislike.
+    for candidate in preferences:
+        wording = _squash(candidate.evidence)
+        hedging = rules.HEDGE.search(wording) or rules.SOFTENED.search(wording)
+        if candidate.category != "allergy" and hedging:
+            candidate.certainty = "uncertain"
+
     hedged = {key for c in baseline.preferences if c.certainty == "uncertain" for key in _keys(c)}
     for candidate in preferences:
         if candidate.category == "diet" and _keys(candidate) & hedged:

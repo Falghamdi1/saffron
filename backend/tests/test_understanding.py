@@ -155,3 +155,34 @@ def test_zero_budget_from_a_model_means_no_budget():
 def test_price_limit_missed_by_the_model_is_restored():
     result, _ = understand("dinner under 60 riyals", FakeProvider(Understanding()))
     assert result.request.max_price == 60
+
+
+@pytest.mark.parametrize("message", [
+    "I don't eat much meat", "I rarely eat meat", "I'm not really into meat",
+])
+def test_softened_statements_from_the_model_stay_unconfirmed(message):
+    firm = Understanding(preferences=[
+        Candidate(category="dislike", value="meat", evidence=message)
+    ])
+    result, _ = understand(message, FakeProvider(firm))
+    assert {c.certainty for c in result.preferences} == {"uncertain"}
+
+
+def test_firm_dislikes_are_not_softened():
+    message = "I really don't like mushrooms"
+    firm = Understanding(preferences=[
+        Candidate(category="dislike", value="mushroom", evidence=message)
+    ])
+    result, _ = understand(message, FakeProvider(firm))
+    assert result.preferences[0].certainty == "explicit"
+
+
+def test_a_brief_overload_is_retried_once():
+    statuses = [503, 200]
+
+    def handler(request):
+        if statuses.pop(0) == 503:
+            return httpx.Response(503)
+        return reply_with({"intent": "greeting"})(request)
+
+    assert gemini(handler).understand("hi").intent == "greeting"

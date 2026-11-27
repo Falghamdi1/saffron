@@ -112,16 +112,18 @@ class GeminiProvider:
             },
         }
         try:
-            response = self._client.post(
-                self.url,
-                json=body,
-                headers={"x-goog-api-key": self._api_key, "Api-Revision": API_REVISION},
-            )
+            response = self._post(body)
+            if response.status_code == 503:  # brief overloads are common; try once more
+                response = self._post(body)
             response.raise_for_status()
             return Understanding.model_validate(json.loads(_output_text(response.json())))
         except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError) as error:
             status = getattr(getattr(error, "response", None), "status_code", None)
             raise LLMError(f"{type(error).__name__} (status {status})") from error
+
+    def _post(self, body: dict) -> httpx.Response:
+        headers = {"x-goog-api-key": self._api_key, "Api-Revision": API_REVISION}
+        return self._client.post(self.url, json=body, headers=headers)
 
 
 def _output_text(payload: dict) -> str:

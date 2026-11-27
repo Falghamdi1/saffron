@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.schemas import Understanding
 from app.understanding.llm import LLMError
 from evaluation.harness import Diner, picks
 
@@ -281,3 +282,22 @@ def test_chat_is_rate_limited(settings):
         diner.say("hello")
         response = client.post("/api/chat", json={"message": "hi"}, headers=diner.headers)
         assert response.status_code == 429
+
+
+class DishAsFoodProvider:
+    """Mimics a model that lists an unknown dish both as a name and as a wanted food."""
+
+    name = "gemini"
+
+    def understand(self, message):
+        return Understanding(
+            intent="dish_question", dish_names=["sushi"], request={"wants": ["sushi"]}
+        )
+
+
+def test_unknown_dish_is_reported_when_the_model_also_calls_it_a_food(settings):
+    with TestClient(create_app(settings, provider=DishAsFoodProvider())) as client:
+        reply = Diner(client).say("Do you have sushi?")
+        assert "isn't on our menu" in reply["content"]
+        assert "couldn't find" not in reply["content"]
+        assert picks(reply)
