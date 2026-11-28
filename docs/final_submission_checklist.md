@@ -88,8 +88,8 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
 | Manual language switch | browser | Verified |
 | Right-to-left interface | screenshots at phone and desktop widths | Partially verified: emulated, no real device |
 | Bilingual menu names, descriptions, ingredients | test that every dish has them | Partially verified: wording not reviewed |
-| Same prices, allergens and diets in both | single menu record; test | Verified |
-| One memory across languages | cross-language tests; browser | Verified |
+| Same prices, allergens and diets in both | one menu record holds both; test | Verified |
+| One memory across languages | cross-language tests with rules; browser | Partially verified: not tested with Gemini |
 
 ## Interface quality
 

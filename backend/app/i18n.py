@@ -70,6 +70,9 @@ _EN = {
              "preferences; if it is your own allergy, tell me “I'm allergic to …”.",
     "unmatched": "I couldn't find an option with {wants} that fits.",
     "nothing_cheaper": "Nothing cheaper fits your requirements.",
+    "blocked": "I can't check an allergy I couldn't identify, so I'm not suggesting dishes. "
+               "Name the allergen another way, or for your own allergy choose it under My "
+               "preferences. For someone else's, you can start a new conversation.",
     "nothing": "Nothing on the menu meets all of your requirements right now. I won't relax "
                "an allergy or diet, but you could raise the budget or change the course.",
     "here_one": "Here is {names}.",
@@ -142,6 +145,9 @@ _AR = {
              "حساسيتك أنت فقل «عندي حساسية من …».",
     "unmatched": "لم أجد خياراً فيه {wants} يناسبك.",
     "nothing_cheaper": "لا يوجد خيار أرخص يناسب متطلباتك.",
+    "blocked": "لا أستطيع فحص حساسية لم أتمكن من تحديدها، لذلك لن أقترح أطباقاً. اذكر مسبب "
+               "الحساسية بصيغة أخرى، وإن كانت حساسيتك فاخترها من «تفضيلاتي». وإن كانت لشخص "
+               "آخر فيمكنك بدء محادثة جديدة.",
     "nothing": "لا يوجد طبق في القائمة يحقق جميع متطلباتك حالياً. لن أتجاوز حساسية أو نظاماً "
                "غذائياً، لكن يمكنك رفع الميزانية أو تغيير نوع الطبق.",
     "here_one": "أقترح عليك {names}.",
@@ -189,7 +195,7 @@ _AR = {
     "ask": "هل أحفظ هذا: {what}؟",
     "ask_avoid": "سأتجنبه احتياطاً إلى أن تؤكد.",
     "unidentified": "لم أتمكن من تحديد مسبب الحساسية «{value}»، لذلك لن أقترح أطباقاً الآن. "
-                    "اختره من «تفضيلاتي» عبر «إضافة حساسية»، ثم ارفض هذا السجل.",
+                    "اختره من «تفضيلاتي» عبر «أضف حساسية»، ثم ارفض هذا السجل.",
     "updated": "تم التحديث: {what} (كان: {previous}).",
     "saved": "حفظت: {what}.",
     "allergy_conflict": "لديك حساسية مسجلة تشمل {food}، لذلك لم أضفه إلى ما تحب. "

@@ -11,6 +11,7 @@ from app.db import Database
 from app.i18n import language_of, say
 from app.memory import repository as memory_repository
 from app.memory import service as memory_service
+from app.memory.policy import unidentified
 from app.menu import load_menu
 from app.recommendation import dishes
 from app.recommendation.engine import Profile, build_profile, matches_food, recommend, violations
@@ -210,6 +211,8 @@ def _suggestions(
             )
 
     result = recommend(menu, profile)
+    if any(unidentified(a) for a in profile.allergies | profile.unconfirmed_allergies):
+        return Turn(say(profile.language, "blocked"))
     text = reply.recommendations(
         [r.item for r in result.recommendations],
         result.excluded, result.unmatched_wants, cheaper, profile.language,

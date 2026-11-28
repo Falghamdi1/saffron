@@ -7,7 +7,8 @@ from fastapi.testclient import TestClient
 
 from app import language
 from app.chat import context
-from app.i18n import STRINGS
+from app.config import ROOT_DIR
+from app.i18n import ARABIC_VALUES, STRINGS
 from app.main import create_app
 from app.memory.policy import normalize
 from app.schemas import Candidate, Understanding
@@ -247,3 +248,29 @@ def test_the_arabic_sample_prompts_work_without_a_model(diner, message, saved_af
         assert [e["item"]["id"] for e in payload["comparison"]] == [
             "butter-chicken", "chicken-vindaloo"
         ]
+
+
+def test_an_unidentified_allergy_of_another_diner_says_how_to_continue(diner):
+    reply = diner.say("زوجتي عندها حساسية من الترمس. وش تنصحني لها؟")
+    assert picks(reply) == []
+    assert "محادثة جديدة" in reply["content"]
+    assert "الميزانية" not in reply["content"]
+    diner.new_conversation()
+    assert picks(diner.say("وش تنصحني للعشا؟"))
+
+
+def test_naming_an_unidentified_allergy_from_the_list_restores_suggestions(diner):
+    diner.say("عندي حساسية من الترمس")
+    assert picks(diner.say("recommend a main")) == []
+    diner.client.post("/api/memory/allergies", json={"allergen": "peanut"}, headers=diner.headers)
+    diner.post(f"/api/memory/{diner.preference_id('allergy', 'الترمس')}/dismiss")
+    reply = diner.say("recommend a main")
+    assert picks(reply)
+    for item in picks(reply):
+        assert violations_by_oracle(item, Limits(allergens=("peanut",))) == []
+
+
+def test_the_interface_labels_every_value_the_server_does():
+    source = (ROOT_DIR / "frontend" / "src" / "format.ts").read_text(encoding="utf-8")
+    table = source.split("const ARABIC")[1].split("};")[0]
+    assert set(re.findall(r"^  (\w+):", table, re.M)) == set(ARABIC_VALUES)

@@ -118,7 +118,8 @@ cd backend
 `--llm` needs a Gemini key and takes about twelve minutes. Running without it is quicker but
 replaces the report with a rules-only one. Latest measured results are in
 [docs/evaluation.md](docs/evaluation.md). No hard-constraint violation was found in the
-constraint sweep. On 30 held-out phrasings Gemini matched 28 exactly and the rule-based
+constraint sweep. On 30 held-out phrasings Gemini matched 28 exactly (measured before its instruction was
+extended for Arabic) and the rule-based
 fallback 13, so the fallback is a safety net, not a substitute for the model. The latest run
 of the scenarios with Gemini was cut short by the free daily quota; the report says what is
 and is not complete.
