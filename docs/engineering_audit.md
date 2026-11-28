@@ -17,7 +17,7 @@ deployment. That check covers C1 (enforced in the chat, not saved), memory acros
 conversations and isolation; the other fixes were verified locally, not on the live site.
 
 A later pass closed M4, L5 and the engine logging and redesigned the interface; those
-changes are not yet deployed. Current numbers are in [evaluation.md](evaluation.md), and
+changes were deployed as `a20aca8`, and the live check passed on it. Current numbers are in [evaluation.md](evaluation.md), and
 current status is in [final_submission_checklist.md](final_submission_checklist.md).
 
 | Finding | State | How it was checked |

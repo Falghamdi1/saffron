@@ -16,8 +16,8 @@ with rules. With Gemini the last complete run passed 29 of 30, the failure being
 error on the test machine; the rerun was cut short by the daily quota. 
 
 **Deployment state:** commit `a20aca8` is deployed: CI and Render reported success, and the
-live site serves the matching build. The live check was last run by the project owner on
-`6c66bb1`, so it has **not** been run on the current version.
+live site serves the matching build. The two-account live check, run by the project owner, passed on this version on
+2026-11-28.
 
 ## Part 1: baseline
 
@@ -32,7 +32,7 @@ live site serves the matching build. The live check was last run by the project 
 | 2.4 Corrections and changing preferences | `app/memory/policy.py`, preferences screen | `tests/test_memory_policy.py`; update scenarios | Verified |
 | 2.5 Returning users are identified | Supabase Auth, `app/auth.py` | `tests/test_auth.py`; live check | Verified |
 | 2.5 Users' memories are isolated | Row Level Security, `app/db.py` | isolation scenarios; `tests/test_api.py`; live check | Verified |
-| 2.6 Deployed application the team can use | Render, <https://saffron-ai-zrnt.onrender.com> | sign-in page of `a20aca8` loaded in a fresh browser tab, both languages, no console errors | Partially verified: signed-in use not re-checked live |
+| 2.6 Deployed application the team can use | Render, <https://saffron-ai-zrnt.onrender.com> | live check on `a20aca8`; sign-in page loaded in a fresh browser tab in both languages with no console errors | Verified |
 
 ## Menu
 
@@ -58,8 +58,8 @@ live site serves the matching build. The live check was last run by the project 
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| 6.1 Working URL, accessible to reviewers | URL in the [README](../README.md) | Partially verified: live check not yet run on this version |
-| 6.1 Supports testing the baseline and the deep dive | "Try it" table in the README | Partially verified: as above |
+| 6.1 Working URL, accessible to reviewers | URL in the [README](../README.md) | Verified: live check on `a20aca8` |
+| 6.1 Supports testing the baseline and the deep dive | "Try it" table in the README | Partially verified: the live check covers memory and isolation, not every example |
 | 6.1 Remains available during evaluation | keep-alive workflow | Not verified: `APP_URL` is not set, so it has never run; free tiers sleep |
 | 6.1 Test instructions or credentials | self-service sign-up described in the README | Partially verified: sign-up was last used before these changes |
 | 6.2 Repository | <https://github.com/Falghamdi1/saffron> (public) | Verified |
@@ -102,16 +102,15 @@ live site serves the matching build. The live check was last run by the project 
 
 ## Before submitting
 
-1. Run the live check (10 `PASS` lines).
-2. While signed in on the live site, open Menu or My preferences and reload: you should stay
+1. While signed in on the live site, open Menu or My preferences and reload: you should stay
    signed in on that section. This was only tried in local mode.
-3. Say an Arabic sesame allergy on the live site and check the suggestions avoid sesame.
-4. In a private window, create a new account on the live site, state an allergy, sign out,
+2. Say an Arabic sesame allergy on the live site and check the suggestions avoid sesame.
+3. In a private window, create a new account on the live site, state an allergy, sign out,
    sign in, start a new conversation and confirm it applies. Try the sesame sentence about
    another person.
-5. Check the site on a real phone.
-6. Set the `APP_URL` repository variable and run **Keep alive** once.
-7. Record the video and upload it to the Drive folder with the URL, repository link and
+4. Check the site on a real phone.
+5. Set the `APP_URL` repository variable and run **Keep alive** once.
+6. Record the video and upload it to the Drive folder with the URL, repository link and
    access notes.
-8. Open every link from a signed-out browser.
-9. Confirm the deadline in HR's message.
+7. Open every link from a signed-out browser.
+8. Confirm the deadline in HR's message.
