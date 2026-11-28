@@ -15,9 +15,9 @@ to files under `backend/`.
 with rules. With Gemini the last complete run passed 29 of 30, the failure being a memory
 error on the test machine; the rerun was cut short by the daily quota. 
 
-**Deployment state:** commit `7e648df` is the one deployed (CI and Render reported success).
-The live check was last run by the project owner on the commit before it, `6c66bb1`. Work
-after `7e648df`, including the redesigned interface, is **not yet deployed**.
+**Deployment state:** commit `a20aca8` is deployed: CI and Render reported success, and the
+live site serves the matching build. The live check was last run by the project owner on
+`6c66bb1`, so it has **not** been run on the current version.
 
 ## Part 1: baseline
 
@@ -32,7 +32,7 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
 | 2.4 Corrections and changing preferences | `app/memory/policy.py`, preferences screen | `tests/test_memory_policy.py`; update scenarios | Verified |
 | 2.5 Returning users are identified | Supabase Auth, `app/auth.py` | `tests/test_auth.py`; live check | Verified |
 | 2.5 Users' memories are isolated | Row Level Security, `app/db.py` | isolation scenarios; `tests/test_api.py`; live check | Verified |
-| 2.6 Deployed application the team can use | Render, <https://saffron-ai-zrnt.onrender.com> | live check on `6c66bb1`; sign-in page of `7e648df` loaded in a fresh browser tab with no console errors | Partially verified: the current code is not deployed |
+| 2.6 Deployed application the team can use | Render, <https://saffron-ai-zrnt.onrender.com> | sign-in page of `a20aca8` loaded in a fresh browser tab, both languages, no console errors | Partially verified: signed-in use not re-checked live |
 
 ## Menu
 
@@ -58,7 +58,7 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| 6.1 Working URL, accessible to reviewers | URL in the [README](../README.md) | Partially verified: current code not deployed |
+| 6.1 Working URL, accessible to reviewers | URL in the [README](../README.md) | Partially verified: live check not yet run on this version |
 | 6.1 Supports testing the baseline and the deep dive | "Try it" table in the README | Partially verified: as above |
 | 6.1 Remains available during evaluation | keep-alive workflow | Not verified: `APP_URL` is not set, so it has never run; free tiers sleep |
 | 6.1 Test instructions or credentials | self-service sign-up described in the README | Partially verified: sign-up was last used before these changes |
@@ -83,13 +83,13 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
 
 | Requirement | Verification | Status |
 | --- | --- | --- |
-| Arabic and English conversations | `tests/test_arabic.py` with rules and a scripted model | Partially verified: not tried with Gemini |
+| Arabic and English conversations | `tests/test_arabic.py` with rules and a scripted model | Partially verified: 12 messages tried with Gemini |
 | Language detected automatically; replies match | same | Partially verified |
 | Manual language switch | browser | Verified |
 | Right-to-left interface | screenshots at phone and desktop widths | Partially verified: emulated, no real device |
 | Bilingual menu names, descriptions, ingredients | test that every dish has them | Partially verified: wording not reviewed |
 | Same prices, allergens and diets in both | one menu record holds both; test | Verified |
-| One memory across languages | cross-language tests with rules; browser | Partially verified: not tested with Gemini |
+| One memory across languages | cross-language tests with rules; browser | Partially verified: one case tried with Gemini |
 
 ## Interface quality
 
@@ -102,8 +102,7 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
 
 ## Before submitting
 
-1. Approve the deploy of the current code. After the model quota resets, run the live check
-   (10 `PASS` lines; before the reset, "language model is in use" fails).
+1. Run the live check (10 `PASS` lines).
 2. While signed in on the live site, open Menu or My preferences and reload: you should stay
    signed in on that section. This was only tried in local mode.
 3. Say an Arabic sesame allergy on the live site and check the suggestions avoid sesame.

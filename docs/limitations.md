@@ -21,7 +21,10 @@ This is a take-home submission, not a production system.
   - without Gemini, only direct statements about allergies, diets, spice, budget and common
     foods are read, mostly in Modern Standard and Gulf wording;
   - without Gemini, an Arabic question about a dish that is not served is not recognised;
-  - Gemini has not been tested with Arabic, or with the instruction added for it;
+  - with Gemini, only a one-off set of 12 Arabic messages has been tried;
+  - with Gemini, asking in Arabic for a dish that is not served may not say so;
+  - a rare allergen can be recorded twice, once translated and once as unidentified, which
+    blocks suggestions until one record is resolved;
   - the Arabic wording and menu text have not been reviewed by a second reader;
   - history reasons and some server error messages are shown in English or generically.
 - Without Gemini, only common wordings of a diet or spice change are recognised.

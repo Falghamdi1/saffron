@@ -232,8 +232,21 @@ ARABIC = """## Arabic
 Arabic is covered by `tests/test_arabic.py` (rules and a scripted model): canonical values,
 attribution, unidentified allergens, replies and memory shared with English. The constraint
 sweep works on canonical values, so it applies to both languages. No Arabic sentences are in
-the scored sets, Gemini has not been run on Arabic, and the Gemini results above were
-measured before its instruction was extended for Arabic.
+the scored sets.
+
+### After the instruction was extended for Arabic
+
+Measured on 2026-11-28 against the deployed code (`a20aca8`), as a separate run; the tables
+above are from the day before.
+
+- English held-out phrasings with Gemini: 29/30 (precision 96%, recall 96%, allergies 5/5).
+- English attribution set with Gemini: 10/10. No model call failed in either set.
+- A one-off check of 12 Arabic messages with Gemini, on a local database: no suggestion
+  contained a stated allergen; another diner's allergy was not saved; a hedged allergy stayed
+  pending; an allergy stated in Arabic applied to an English request in a new conversation.
+- Two weaknesses seen: asking for sushi in Arabic replied with the English word and did not
+  say it is not served; for lupin, Gemini translated the word while the rules also kept it as
+  unidentified, so two records appeared and suggestions stayed blocked until one is resolved.
 """
 
 NOT_COVERED = """## Not covered by this report

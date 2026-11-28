@@ -41,8 +41,8 @@ turns the interface right-to-left, replies follow the language of each message, 
 have Arabic names, descriptions and ingredients. Memory is stored once in language-neutral
 keys, so a preference given in Arabic applies in English and the reverse.
 
-Arabic is **partially verified**: it is covered by automated tests and was checked on screen,
-but has not been tested with Gemini or reviewed by a second Arabic reader.
+Arabic is **partially verified**: automated tests, screen checks and a one-off check of 12
+messages with Gemini. It has no independent test set and no review by a second Arabic reader.
 
 ## Architecture
 
@@ -118,8 +118,8 @@ cd backend
 `--llm` needs a Gemini key and takes about twelve minutes. Running without it is quicker but
 replaces the report with a rules-only one. Latest measured results are in
 [docs/evaluation.md](docs/evaluation.md). No hard-constraint violation was found in the
-constraint sweep. On 30 held-out phrasings Gemini matched 28 exactly (measured before its instruction was
-extended for Arabic) and the rule-based
+constraint sweep. On 30 held-out phrasings Gemini matched 29 exactly with the deployed
+instruction, and the rule-based
 fallback 13, so the fallback is a safety net, not a substitute for the model. The latest run
 of the scenarios with Gemini was cut short by the free daily quota; the report says what is
 and is not complete.
