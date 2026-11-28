@@ -60,7 +60,7 @@ live site serves the matching build. The two-account live check, run by the proj
 | --- | --- | --- |
 | 6.1 Working URL, accessible to reviewers | URL in the [README](../README.md) | Verified: live check on `a20aca8` |
 | 6.1 Supports testing the baseline and the deep dive | "Try it" table in the README | Partially verified: the live check covers memory and isolation, not every example |
-| 6.1 Remains available during evaluation | keep-alive workflow | Not verified: `APP_URL` is not set, so it has never run; free tiers sleep |
+| 6.1 Remains available during evaluation | keep-alive workflow | Partially verified: the scheduled ping succeeds, but GitHub ran it only twice in about eight hours, so the free server still sleeps |
 | 6.1 Test instructions or credentials | self-service sign-up described in the README | Partially verified: sign-up was last used before these changes |
 | 6.2 Repository | <https://github.com/Falghamdi1/saffron> (public) | Verified |
 | 6.2 README: run locally, architecture, decisions, setup, limitations | [README](../README.md) | Verified: steps followed in a clean copy of the files |
@@ -109,7 +109,8 @@ live site serves the matching build. The two-account live check, run by the proj
    sign in, start a new conversation and confirm it applies. Try the sesame sentence about
    another person.
 4. Check the site on a real phone.
-5. Set the `APP_URL` repository variable and run **Keep alive** once.
+5. Point an uptime monitor at `/api/health` every 10 minutes, because GitHub's schedule is
+   too irregular to keep the server awake, or open the site shortly before a review.
 6. Record the video and upload it to the Drive folder with the URL, repository link and
    access notes.
 7. Open every link from a signed-out browser.
