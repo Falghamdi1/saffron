@@ -113,6 +113,18 @@ and nobody had written a sentence about someone else.
 Set like a printed menu so dishes are easy to scan and compare, with allergen text more
 prominent than other details. See [interface.md](interface.md).
 
+## Arabic and English
+
+The brief describes Foodics products serving Arabic and English customers (the English
+product page I checked does not itself state the supported languages). The risk in adding a
+second language is not translation; it is that safety rules written for English silently
+stop applying. The first check found exactly that: an Arabic sesame allergy could be stored
+as written, match nothing, and leave sesame dishes in the suggestions.
+
+So the order was: shared canonical memory and safeguards first, replies and menu text
+second, right-to-left interface last. Cost: Arabic phrase patterns are narrow, and dialect
+coverage is mostly Gulf.
+
 ## Left out on purpose
 
 | Not built | Reason |
@@ -122,13 +134,12 @@ prominent than other details. See [interface.md](interface.md).
 | Streaming replies | replies are short and composed instantly |
 | Search over past chats | structured memory answers the same questions reliably |
 | Learning weights from behaviour | there is no behaviour data to learn or validate from |
-| Arabic | important for this market, but needs its own extraction and evaluation |
 | Food photography | stock images would misrepresent fictional dishes |
 
 ## With more time
 
 1. A larger evaluation set written by other people, especially about attribution.
-2. Arabic input and a right-to-left interface.
+2. An Arabic evaluation set written by other people, and a review of the Arabic wording.
 3. Follow-up resolution ("yes", "the second one") using recent turns.
 4. Expiry and re-confirmation for old inferred tastes.
 5. A low-privilege database role, a shared rate limiter and browser tests.

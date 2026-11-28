@@ -8,6 +8,7 @@ from psycopg.types.json import Jsonb
 
 from app.chat import context, reply, repository
 from app.db import Database
+from app.i18n import language_of, say
 from app.memory import repository as memory_repository
 from app.memory import service as memory_service
 from app.menu import load_menu
@@ -62,14 +63,15 @@ def handle_message(
         conversation_id = conversation["id"]
         repository.add_message(connection, user_id, conversation_id, "user", message)
 
+        lang = language_of(message)
         notes = memory_service.remember(
-            connection, user_id, understanding.preferences, message
+            connection, user_id, understanding.preferences, message, lang
         )
         state = conversation["context"]
         previous = RequestConstraints(**state.get("request", {}))
         stated = context.clean(understanding.request)
         request = context.merge(previous, stated, understanding.preferences)
-        _note_table_allergies(connection, user_id, previous, request, notes)
+        _note_table_allergies(connection, user_id, previous, request, notes, lang)
         # A price limit carried from an earlier message is worth mentioning when it bites.
         earlier_limit = None
         if stated.max_price is None and request.max_price == previous.max_price:
@@ -86,6 +88,7 @@ def handle_message(
             "notice": reply.safety_notice(profile)
             if turn.recommendations or turn.comparison else "",
             "engine": engine,
+            "lang": lang,
         }
         repository.add_message(
             connection, user_id, conversation_id, "assistant", turn.text, payload
@@ -107,6 +110,7 @@ def _note_table_allergies(
     previous: RequestConstraints,
     request: RequestConstraints,
     notes: list[MemoryNote],
+    lang: str,
 ) -> None:
     """Say which allergies now apply to this chat without being the customer's own."""
     known = set(previous.allergies) | {
@@ -115,7 +119,8 @@ def _note_table_allergies(
     }
     added = [a for a in request.allergies if a not in known]
     if added:
-        notes.append(MemoryNote(kind="temporary", message=reply.table_allergies(added)))
+        message = reply.table_allergies(added, lang)
+        notes.append(MemoryNote(kind="temporary", message=message))
 
 
 def _respond(
@@ -131,7 +136,8 @@ def _respond(
     """Choose the kind of answer this message needs. May drop spent wants from `request`."""
     memory: list[Preference] = memory_repository.live_preferences(connection, user_id)
     menu = load_menu(connection)
-    profile = build_profile(memory, request)
+    lang = language_of(message)
+    profile = build_profile(memory, request, lang)
     mentioned = dishes.mentioned(message, menu)
     intent = understanding.intent
     unknown = ""
@@ -140,7 +146,7 @@ def _respond(
         by_id = {item.id: item for item in menu}
         targets = mentioned if len(mentioned) >= 2 else [by_id[i] for i in shown if i in by_id]
         if len(targets) < 2:
-            turn = Turn("Which two dishes would you like me to compare?")
+            turn = Turn(say(lang, "which_dishes"))
         else:
             request.wants = []  # a question about named dishes is not a standing request
             turn = _named_dishes(targets[:3], profile, reply.comparison)
@@ -150,10 +156,11 @@ def _respond(
     else:
         missing = _unknown_dishes(understanding, menu) if intent == "dish_question" else []
         if missing:
-            unknown = reply.unknown_dish(missing[0][:60]) + " These are on the menu instead."
+            unknown = say(lang, "unknown_dish", name=missing[0][:60])
+            unknown += " " + say(lang, "instead")
             # Do not keep searching for something the kitchen does not make.
             request.wants = [w for w in request.wants if singular(w) not in map(singular, missing)]
-            profile = build_profile(memory, request)
+            profile = build_profile(memory, request, lang)
 
         refresh_after_change = intent == "share" and shown and notes
         if intent in ("recommend", "dish_question") or refresh_after_change:
@@ -161,11 +168,11 @@ def _respond(
                 menu, profile, shown, understanding.request.cheaper, earlier_limit
             )
         elif intent == "greeting":
-            turn = Turn(f"Welcome to Saffron. {reply.HELP}")
+            turn = Turn(f"{say(lang, 'welcome')} {say(lang, 'help')}")
         elif intent == "share" and notes:
-            turn = Turn("Would you like some suggestions?")
+            turn = Turn(say(lang, "offer"))
         else:
-            turn = Turn("" if notes else reply.HELP)
+            turn = Turn("" if notes else say(lang, "help"))
 
     turn.text = " ".join(
         part for part in (reply.acknowledgement(notes), unknown, turn.text) if part
@@ -178,7 +185,7 @@ def _named_dishes(items: list[MenuItem], profile: Profile, describe) -> Turn:
     # A question about a named dish is not limited to the current course filter.
     pairs = [(item, violations(item, profile)) for item in items]
     return Turn(
-        describe(pairs),
+        describe(pairs, profile.language),
         comparison=[{"item": i.model_dump(), "violations": v} for i, v in pairs],
         shown=[i.id for i, _ in pairs],
     )
@@ -204,12 +211,15 @@ def _suggestions(
 
     result = recommend(menu, profile)
     text = reply.recommendations(
-        [r.item.name for r in result.recommendations],
-        result.excluded, result.unmatched_wants, cheaper,
+        [r.item for r in result.recommendations],
+        result.excluded, result.unmatched_wants, cheaper, profile.language,
     )
-    over_budget = any("over your" in r for e in result.excluded for r in e.reasons)
+    limit = profile.max_price
+    over_budget = limit is not None and any(
+        item.price > limit for item in menu if item.id in {e.item_id for e in result.excluded}
+    )
     if earlier_limit and over_budget and not cheaper:
-        text += " " + reply.earlier_limit(earlier_limit)
+        text += " " + reply.earlier_limit(earlier_limit, profile.language)
     return Turn(
         text,
         recommendations=result.recommendations,
@@ -223,6 +233,7 @@ def _unknown_dishes(understanding: Understanding, menu: list[MenuItem]) -> list[
         name for name in understanding.dish_names
         if not set(name.lower().split()) & dishes.NOT_DISH_NAMES
         and not any(matches_food(item, name) for item in menu)
+        and not dishes.mentioned(name, menu)
     ]
     # "Do you have vegan desserts?" is a filtered request, not a missing dish. A model
     # may also list the unknown dish as a wanted food, which does not count.

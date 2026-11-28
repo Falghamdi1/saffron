@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Api } from "../api";
+import { useLanguage } from "../i18n";
 import type { MenuItem } from "../types";
 import CompareTable from "./CompareTable";
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function CompareDialog({ api, items, onClose }: Props) {
+  const { t } = useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   const [violations, setViolations] = useState<string[][]>();
   const [unchecked, setUnchecked] = useState(false);
@@ -37,15 +39,15 @@ export default function CompareDialog({ api, items, onClose }: Props) {
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 id="compare-title" className="font-display text-xl font-semibold">
-          Side by side
+          {t.sideBySide}
         </h2>
         <button className="btn btn-quiet" onClick={() => dialog.current?.close()}>
-          Close
+          {t.close}
         </button>
       </div>
       {unchecked && (
         <p role="alert" className="text-alert mb-2 text-sm">
-          I couldn't check these against your preferences. Please check the allergens below.
+          {t.unchecked}
         </p>
       )}
       <CompareTable items={items} violations={violations} />

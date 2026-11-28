@@ -1,9 +1,13 @@
 """Arabic input must reach the same structured memory and safety rules as English."""
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
+from app import language
 from app.chat import context
+from app.i18n import STRINGS
 from app.main import create_app
 from app.memory.policy import normalize
 from app.schemas import Candidate, Understanding
@@ -174,3 +178,72 @@ def test_asking_for_something_without_a_food_never_asks_for_it(message):
     assert request.wants == []
     assert request.avoid == ["nut"]
     assert request.category == "dessert"
+
+
+def test_every_dish_has_arabic_text_matching_its_english_facts():
+    for item in MENU.values():
+        assert language.is_arabic(item.name_ar) and language.is_arabic(item.description_ar)
+        assert len(item.ingredients_ar) == len(item.ingredients), item.id
+        assert all(language.is_arabic(i) for i in item.ingredients_ar), item.id
+
+
+def test_both_languages_have_the_same_sentences_and_placeholders():
+    english, arabic_text = STRINGS["en"], STRINGS["ar"]
+    assert set(english) == set(arabic_text)
+    for key, text in english.items():
+        wanted = set(re.findall(r"{(\w+)}", text))
+        # Arabic may drop a count, but must never need a value English does not supply.
+        assert set(re.findall(r"{(\w+)}", arabic_text[key])) <= wanted, key
+
+
+def test_an_arabic_message_gets_an_arabic_answer_with_the_same_prices(diner):
+    reply = diner.say("عندي حساسية من السمسم، وش تنصحني للعشا؟")
+    payload = reply["payload"]
+    assert payload["lang"] == "ar"
+    assert "حفظت" in reply["content"] and "السمسم" in payload["notice"]
+    for entry in payload["recommendations"]:
+        item = MENU[entry["item"]["id"]]
+        assert entry["item"] == item.model_dump()
+        assert item.name_ar in reply["content"]
+        assert all(language.is_arabic(reason) for reason in entry["reasons"])
+
+
+def test_a_dish_asked_about_by_its_arabic_name_is_checked(diner):
+    diner.say("عندي حساسية من السمسم")
+    reply = diner.say("هل عندكم حمص كلاسيكي؟")
+    assert [c["item"]["id"] for c in reply["payload"]["comparison"]] == ["hummus"]
+    assert "لا أنصحك به" in reply["content"]
+    assert "22 ر.س" in reply["content"]
+
+
+def test_menu_explanations_follow_the_requested_language(diner):
+    diner.say("I'm allergic to sesame")
+    arabic_menu = {i["id"]: i for i in diner.get("/api/menu?lang=ar").json()}
+    english_menu = {i["id"]: i for i in diner.get("/api/menu").json()}
+    assert english_menu["hummus"]["violations"] == ["contains sesame"]
+    assert arabic_menu["hummus"]["violations"] == ["يحتوي على السمسم"]
+    assert [bool(i["violations"]) for i in arabic_menu.values()] == [
+        bool(i["violations"]) for i in english_menu.values()
+    ]
+
+
+# The sample prompts offered by the Arabic interface.
+@pytest.mark.parametrize(("message", "saved_after", "shown"), [
+    ("أنا نباتي وأحب الفطر", {("diet", "vegetarian"), ("like", "mushroom")}, None),
+    ("وش تنصحني للعشا أقل من 60 ريال؟", set(), "recommendations"),
+    ("عندي حساسية من المكسرات. أي حلى أقدر آكل؟",
+     {("allergy", "peanut"), ("allergy", "tree_nut")}, "recommendations"),
+    ("قارن بين دجاج بالزبدة و دجاج فيندالو", set(), "comparison"),
+])
+def test_the_arabic_sample_prompts_work_without_a_model(diner, message, saved_after, shown):
+    reply = diner.say(message)
+    assert diner.preferences() == saved_after
+    payload = reply["payload"]
+    if shown:
+        assert payload[shown], reply["content"]
+    for entry in payload["recommendations"]:
+        assert entry["item"]["price"] <= 60 or "60" not in message
+    if shown == "comparison":
+        assert [e["item"]["id"] for e in payload["comparison"]] == [
+            "butter-chicken", "chicken-vindaloo"
+        ]

@@ -34,6 +34,16 @@ Rules the policy enforces:
 - Statements about other people are not saved. Their allergies apply to that conversation.
 - Corrections supersede the old record. History is append-only at the database level.
 
+## Languages
+
+English is the default. Arabic, including common Gulf wording, is also supported: a switch
+turns the interface right-to-left, replies follow the language of each message, and dishes
+have Arabic names, descriptions and ingredients. Memory is stored once in language-neutral
+keys, so a preference given in Arabic applies in English and the reverse.
+
+Arabic is **partially verified**: it is covered by automated tests and was checked on screen,
+but has not been tested with Gemini or reviewed by a second Arabic reader.
+
 ## Architecture
 
 One FastAPI service serves the API and the React client. Supabase provides authentication
@@ -93,6 +103,7 @@ proxied.
 | "My wife is allergic to sesame. What mains can she have?" | Sesame avoided in this chat; not saved as yours |
 | "Compare butter chicken and chicken vindaloo" | Side-by-side table with conflicts marked |
 | "Do you have sushi?" | Says it is not on the menu |
+| "عندي حساسية من السمسم. وش تنصحني؟" | Arabic reply; no sesame dishes; the same record shows in English |
 
 **My preferences** shows every record, its source sentence and its history.
 
@@ -114,7 +125,8 @@ and is not complete.
 
 ## Known limitations
 
-- English only; replies are templated and the model sees one message at a time.
+- Replies are templated and the model sees one message at a time.
+- Arabic understanding without Gemini is narrow.
 - Without Gemini, many natural phrasings are missed. The free quota is shared, so it can run
   out.
 - Whom a sentence is about is decided by wording patterns.

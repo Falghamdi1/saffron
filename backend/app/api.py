@@ -124,21 +124,25 @@ def conversation_messages(
 
 
 @router.get("/menu")
-def menu(user: User = Depends(signed_in), db: Database = Depends(database)) -> list[dict]:
+def menu(
+    lang: Literal["en", "ar"] = "en",
+    user: User = Depends(signed_in), db: Database = Depends(database),
+) -> list[dict]:
     """The full menu, each dish marked with why it does not suit this user."""
     with db.user_session(user.id) as connection:
         memory = memory_repository.live_preferences(connection, user.id)
         items = load_menu(connection)
     # Budget is per request, so browsing does not flag prices.
     profile = build_profile(
-        [p for p in memory if p.category != "budget"], RequestConstraints()
+        [p for p in memory if p.category != "budget"], RequestConstraints(), lang
     )
     return [{**i.model_dump(), "violations": violations(i, profile)} for i in items]
 
 
 @router.post("/favorites/{item_id}")
 def add_favorite(
-    item_id: str, user: User = Depends(signed_in), db: Database = Depends(database)
+    item_id: str, lang: Literal["en", "ar"] = "en",
+    user: User = Depends(signed_in), db: Database = Depends(database),
 ) -> dict:
     with db.user_session(user.id) as connection:
         item = next((i for i in load_menu(connection) if i.id == item_id), None)
@@ -148,6 +152,7 @@ def add_favorite(
             connection, user.id,
             [Candidate(category="favorite_dish", value=item.id)],
             f"Saved {item.name} as a favourite",
+            lang,
         )
     return {"memory_notes": [n.model_dump() for n in notes]}
 

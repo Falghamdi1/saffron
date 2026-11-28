@@ -1,6 +1,8 @@
-import type { Preference } from "./types";
+import type { Lang } from "./i18n";
+import type { MenuItem, Preference } from "./types";
 
-const ALLERGEN_LABELS: Record<string, string> = {
+// Display labels for the canonical values the server stores.
+const ENGLISH: Record<string, string> = {
   milk: "dairy",
   peanut: "peanuts",
   tree_nut: "tree nuts",
@@ -8,43 +10,78 @@ const ALLERGEN_LABELS: Record<string, string> = {
   mollusc: "molluscs",
 };
 
+const ARABIC: Record<string, string> = {
+  milk: "الألبان", egg: "البيض", fish: "السمك", crustacean: "القشريات", mollusc: "الرخويات",
+  peanut: "الفول السوداني", tree_nut: "المكسرات الشجرية", gluten: "الجلوتين", soy: "الصويا",
+  sesame: "السمسم", mustard: "الخردل", celery: "الكرفس", sulphites: "الكبريتيت",
+  vegetarian: "نباتي", vegan: "نباتي صرف", pescatarian: "نباتي مع السمك",
+  gluten_free: "خالٍ من الجلوتين", dairy_free: "خالٍ من الألبان",
+  none: "بدون حار", mild: "خفيف", medium: "متوسط", hot: "حار",
+  levantine: "شامي", gulf: "خليجي", indian: "هندي", mediterranean: "متوسطي",
+  chicken: "الدجاج", meat: "اللحم", lamb: "لحم الغنم", beef: "لحم البقر", prawn: "الروبيان",
+  mushroom: "الفطر", halloumi: "الحلومي", cheese: "الجبن", nut: "المكسرات", mango: "المانجو",
+};
+
 export const ALLERGENS = [
   "milk", "egg", "fish", "crustacean", "mollusc", "peanut", "tree_nut",
   "gluten", "soy", "sesame", "mustard", "celery", "sulphites",
 ];
 
-export const SPICE_NAMES = ["Not spicy", "Mild", "Medium", "Hot"];
+const SPICE_NAMES: Record<Lang, string[]> = {
+  en: ["Not spicy", "Mild", "Medium", "Hot"],
+  ar: ["غير حار", "خفيف", "متوسط", "حار"],
+};
 
-export const label = (value: string) => ALLERGEN_LABELS[value] ?? value.replace(/_/g, "-");
+export const spiceName = (level: number, lang: Lang) => SPICE_NAMES[lang][level];
 
-// A non-breaking space keeps the currency with its amount.
-export const price = (amount: number) => `SAR ${amount}`;
+export function label(value: string, lang: Lang): string {
+  if (lang === "ar") return ARABIC[value] ?? value.replace(/-/g, " ");
+  return ENGLISH[value] ?? value.replace(/_/g, "-");
+}
 
-export function preferenceText(preference: Pick<Preference, "category" | "value">): string {
+export const list = (values: string[], lang: Lang) =>
+  values.map((value) => label(value, lang)).join(lang === "ar" ? "، " : ", ");
+
+// A non-breaking space keeps the currency with its amount. Western digits in both languages.
+export const price = (amount: number, lang: Lang) =>
+  lang === "ar" ? `${amount} ر.س` : `SAR ${amount}`;
+
+export const dishText = (item: MenuItem, lang: Lang) =>
+  lang === "ar" && item.name_ar
+    ? { name: item.name_ar, description: item.description_ar, ingredients: item.ingredients_ar }
+    : { name: item.name, description: item.description, ingredients: item.ingredients };
+
+export function preferenceText(
+  preference: Pick<Preference, "category" | "value">,
+  lang: Lang,
+): string {
   const { category, value } = preference;
+  const shown = label(value, lang);
+  const ar = lang === "ar";
   switch (category) {
     case "allergy":
-      return `Allergic to ${label(value)}`;
+      return ar ? `حساسية من ${shown}` : `Allergic to ${shown}`;
     case "diet":
-      return `Follows a ${label(value)} diet`;
+      return ar ? `النظام الغذائي: ${shown}` : `Follows a ${shown} diet`;
     case "like":
-      return `Likes ${value}`;
+      return ar ? `تحب ${shown}` : `Likes ${value}`;
     case "dislike":
-      return `Avoids ${value}`;
+      return ar ? `تتجنب ${shown}` : `Avoids ${value}`;
     case "cuisine":
-      return `Enjoys ${value} food`;
+      return ar ? `تحب المطبخ ال${shown}` : `Enjoys ${value} food`;
     case "spice":
-      return `Spice: ${value === "none" ? "none at all" : value}`;
+      return ar ? `الحرارة: ${shown}` : `Spice: ${value === "none" ? "none at all" : value}`;
     case "budget":
-      return `Up to SAR ${value} per dish`;
+      return ar ? `حتى ${value} ر.س للطبق` : `Up to SAR ${value} per dish`;
     default:
-      return `Favourite: ${value.replace(/-/g, " ")}`;
+      return `${ar ? "مفضل" : "Favourite"}: ${value.replace(/-/g, " ")}`;
   }
 }
 
-export function when(timestamp: string): string {
+export function when(timestamp: string, lang: Lang): string {
   const date = new Date(timestamp.replace(" ", "T").replace(/\+00$/, "Z"));
+  const locale = lang === "ar" ? "ar-SA-u-ca-gregory-nu-latn" : "en-GB";
   return Number.isNaN(date.getTime())
     ? ""
-    : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    : date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }

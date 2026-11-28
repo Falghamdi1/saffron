@@ -6,6 +6,7 @@ hard constraint, so no score can outweigh an allergy, diet, budget or stock rule
 
 from dataclasses import dataclass, field
 
+from app.i18n import join, name, say
 from app.memory.policy import unidentified
 from app.schemas import Exclusion, MenuItem, Preference, Recommendation, RequestConstraints
 from app.vocabulary import (
@@ -14,7 +15,6 @@ from app.vocabulary import (
     INGREDIENT_GROUPS,
     SPICE_LEVELS,
     allergens_for,
-    label,
     singular,
 )
 
@@ -35,9 +35,12 @@ class Profile:
     max_price: float | None = None
     category: str | None = None
     wants: tuple[str, ...] = field(default=())
+    language: str = "en"  # of the sentences explaining a result; never affects filtering
 
 
-def build_profile(memory: list[Preference], request: RequestConstraints) -> Profile:
+def build_profile(
+    memory: list[Preference], request: RequestConstraints, language: str = "en"
+) -> Profile:
     active = [p for p in memory if p.status == "active"]
 
     def values(category: str) -> set[str]:
@@ -70,6 +73,7 @@ def build_profile(memory: list[Preference], request: RequestConstraints) -> Prof
         max_price=request.max_price or budget,
         category=request.category,
         wants=wants,
+        language=language,
     )
 
 
@@ -89,60 +93,71 @@ def matches_food(item: MenuItem, term: str) -> bool:
 def violations(item: MenuItem, profile: Profile) -> list[str]:
     """Every hard constraint this item breaks. An empty list means it is eligible."""
     found: list[str] = []
+    lang = profile.language
+
+    def broken(key: str, **values: object) -> None:
+        found.append(say(lang, key, **values))
+
     if not item.available:
-        found.append("currently unavailable")
+        broken("v_unavailable")
 
     allergies = profile.allergies | profile.unconfirmed_allergies
     for allergy in sorted(allergies):
         if unidentified(allergy):
-            found.append("an allergy has not been identified")
+            broken("v_unidentified")
         elif allergy in ALLERGENS:
             if allergy in item.allergens:
-                found.append(f"contains {label(allergy)}")
+                broken("v_contains", food=name(allergy, lang))
             elif allergy in item.may_contain:
-                found.append(f"may contain {label(allergy)}")
+                broken("v_may_contain", food=name(allergy, lang))
         elif matches_food(item, allergy):
-            found.append(f"contains {allergy}")
+            broken("v_contains", food=name(allergy, lang))
     if allergies and not item.allergen_info_complete:
-        found.append("allergen information is incomplete")
+        broken("v_incomplete")
 
     for diet in sorted(profile.diets):
         if diet not in item.diets:
-            found.append(f"not {label(diet)}")
+            broken("v_not_diet", diet=name(diet, lang))
         elif diet == "gluten_free" and "gluten" in item.may_contain:
-            found.append("may contain gluten")
+            broken("v_may_contain", food=name("gluten", lang))
 
     for food in sorted(profile.dislikes):
         covered = allergens_for(food) if food in ALLERGEN_CLASSES else ()
         if matches_food(item, food) or set(covered) & set(item.allergens):
-            found.append(f"includes {food}, which you avoid")
+            broken("v_dislike", food=name(food, lang))
 
     if profile.max_price is not None and item.price > profile.max_price:
-        found.append(f"SAR {item.price:g} is over your SAR {profile.max_price:g} budget")
+        broken("v_budget", price=f"{item.price:g}", limit=f"{profile.max_price:g}")
     return found
 
 
 def _score(item: MenuItem, profile: Profile) -> tuple[float, list[str]]:
     score = 0.0
     reasons: list[str] = []
+    lang = profile.language
+
+    def because(key: str, **values: object) -> None:
+        reasons.append(say(lang, key, **values))
 
     for want in profile.wants:
         if matches_food(item, want):
             score += 5
-            reasons.append(f"Matches your request for {want}")
+            because("r_want", food=name(want, lang))
 
     liked = sorted(food for food in profile.likes if matches_food(item, food))
     if liked:
         score += 3 * len(liked)
-        reasons.append(f"Features {', '.join(liked)}, which you like")
+        foods = [name(food, lang) for food in liked]
+        because("r_likes", foods=("، " if lang == "ar" else ", ").join(foods))
 
     if item.id in profile.favorites:
         score += 3
-        reasons.append("One of your saved favourites")
+        because("r_favourite")
 
     if item.cuisine in profile.cuisines:
         score += 2
-        reasons.append(f"{item.cuisine.title()} cuisine, which you enjoy")
+        cuisine = name(item.cuisine, lang)
+        because("r_cuisine", cuisine=cuisine.title() if lang == "en" else cuisine)
 
     for diet in sorted(profile.soft_diets):
         if diet in item.diets:
@@ -153,33 +168,31 @@ def _score(item: MenuItem, profile: Profile) -> tuple[float, list[str]]:
         # Too hot is worse than too mild, unless the user is asking for heat.
         score -= 2.5 * gap if gap > 0 else -gap * (1.5 if profile.spice >= 2 else 0.25)
         if gap == 0:
-            reasons.append(f"Spice level is {SPICE_LEVELS[item.spice_level]}, as you prefer")
+            because("r_spice", level=name(SPICE_LEVELS[item.spice_level], lang))
 
     if item.category == "main":
         score += 0.75
 
     if profile.diets:
-        reasons.append(
-            "Meets your " + " and ".join(label(d) for d in sorted(profile.diets)) + " requirement"
-        )
+        diets = [name(d, lang) for d in sorted(profile.diets)]
+        because("r_diet", diets=join(diets, lang))
     if profile.max_price is not None:
-        reasons.append(f"SAR {item.price:g}, within your SAR {profile.max_price:g} budget")
+        because("r_budget", price=f"{item.price:g}", limit=f"{profile.max_price:g}")
     allergies = sorted(profile.allergies | profile.unconfirmed_allergies)
     if allergies:
-        *rest, last = [label(a) for a in allergies]
-        named = f"{', '.join(rest)} or {last}" if rest else last
-        reasons.append(f"No {named} listed in its recorded ingredients")
+        named = [name(a, lang) for a in allergies]
+        because("r_allergies", allergies=join(named, lang, last="or"))
     if not reasons:
-        reasons.append(item.description)
+        reasons.append(item.description_ar if lang == "ar" else item.description)
     return score, reasons
 
 
 def _cautions(item: MenuItem, profile: Profile) -> list[str]:
     cautions = []
     if not item.allergen_info_complete:
-        cautions.append("Allergen information for this dish is incomplete.")
+        cautions.append(say(profile.language, "c_incomplete"))
     if profile.spice is not None and item.spice_level > profile.spice:
-        cautions.append("Spicier than you usually like.")
+        cautions.append(say(profile.language, "c_spicier"))
     return cautions
 
 

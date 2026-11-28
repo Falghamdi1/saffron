@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { Api } from "../api";
 import { preferenceText } from "../format";
+import { useLanguage } from "../i18n";
 import type { Conversation, Memory, MemoryAction, Message } from "../types";
 import { ErrorBanner, Loading } from "./Feedback";
 import Icon from "./Icons";
 import MessageView from "./MessageView";
 import type { DishActions } from "./Workspace";
 
-const SUGGESTIONS = [
-  "I'm vegetarian and I love mushrooms",
-  "What should I have for dinner under SAR 60?",
-  "I'm allergic to nuts. Which desserts can I have?",
-  "Compare Butter Chicken and Chicken Vindaloo",
-];
+const SUGGESTIONS = {
+  en: [
+    "I'm vegetarian and I love mushrooms",
+    "What should I have for dinner under SAR 60?",
+    "I'm allergic to nuts. Which desserts can I have?",
+    "Compare Butter Chicken and Chicken Vindaloo",
+  ],
+  ar: [
+    "أنا نباتي وأحب الفطر",
+    "وش تنصحني للعشا أقل من 60 ريال؟",
+    "عندي حساسية من المكسرات. أي حلى أقدر آكل؟",
+    "قارن بين دجاج بالزبدة و دجاج فيندالو",
+  ],
+};
 
 interface Props {
   api: Api;
@@ -24,6 +33,7 @@ interface Props {
 
 export default function ChatView(props: Props) {
   const { api, memory, dishActions, onMemoryChanged, onChangeMemory } = props;
+  const { lang, t } = useLanguage();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -105,8 +115,8 @@ export default function ChatView(props: Props) {
   return (
     <div className="grid h-full grid-cols-1 md:grid-cols-[14rem_1fr] xl:grid-cols-[15rem_1fr_17rem]">
       <aside
-        aria-label="Past conversations"
-        className={`border-line overflow-y-auto overscroll-contain border-r p-3 ${
+        aria-label={t.past}
+        className={`border-line overflow-y-auto overscroll-contain border-e p-3 ${
           historyOpen ? "block" : "hidden md:block"
         }`}
       >
@@ -115,27 +125,28 @@ export default function ChatView(props: Props) {
             className="btn btn-quiet mb-2 w-full md:hidden"
             onClick={() => setHistoryOpen(false)}
           >
-            Back to chat
+            {t.back}
           </button>
         )}
         <button className="btn btn-quiet w-full" onClick={() => void open(null)}>
-          New conversation
+          {t.newConversation}
         </button>
-        <h2 className="mt-5 mb-1 px-2 text-sm font-semibold">Earlier conversations</h2>
+        <h2 className="mt-5 mb-1 px-2 text-sm font-semibold">{t.earlier}</h2>
         {conversations.length === 0 && (
-          <p className="text-muted px-2 text-sm">Your past chats will appear here.</p>
+          <p className="text-muted px-2 text-sm">{t.noChats}</p>
         )}
         <ul>
           {conversations.map((conversation) => (
             <li key={conversation.id}>
               <button
-                className={`rounded-control min-h-10 w-full truncate px-2 text-left text-sm pointer-coarse:min-h-11 ${
+                className={`rounded-control min-h-10 w-full truncate px-2 text-start text-sm pointer-coarse:min-h-11 ${
                   conversation.id === conversationId
                     ? "bg-line/50 font-semibold"
                     : "text-muted hover:text-ink hover:bg-line/30"
                 }`}
                 aria-current={conversation.id === conversationId ? "true" : undefined}
                 title={conversation.title}
+                dir="auto"
                 onClick={() => void open(conversation.id)}
               >
                 {conversation.title}
@@ -147,14 +158,14 @@ export default function ChatView(props: Props) {
 
       <section
         className={`min-h-0 min-w-0 flex-col ${historyOpen ? "hidden md:flex" : "flex"}`}
-        aria-label="Conversation"
+        aria-label={t.conversation}
       >
         <div className="border-line flex gap-5 border-b px-4 md:hidden">
           <button className="btn-text" onClick={() => setHistoryOpen(true)}>
-            History
+            {t.history}
           </button>
           <button className="btn-text" onClick={() => void open(null)}>
-            New chat
+            {t.newChat}
           </button>
         </div>
 
@@ -162,17 +173,14 @@ export default function ChatView(props: Props) {
           <div className="mx-auto flex max-w-2xl flex-col gap-5">
             {messages.length === 0 && busy === "idle" && (
               <div className="pt-2 sm:pt-8">
-                <h2 className="font-display text-3xl font-semibold">What are you in the mood for?</h2>
-                <p className="text-muted mt-2 max-w-prose">
-                  Mention allergies, tastes or a budget as they come to you. I'll remember them for
-                  next time.
-                </p>
-                <h3 className="mt-7 text-sm font-semibold">Try one of these</h3>
+                <h2 className="font-display text-3xl font-semibold">{t.mood}</h2>
+                <p className="text-muted mt-2 max-w-prose">{t.moodNote}</p>
+                <h3 className="mt-7 text-sm font-semibold">{t.tryThese}</h3>
                 <ul className="border-line divide-line mt-2 divide-y border-y">
-                  {SUGGESTIONS.map((suggestion) => (
+                  {SUGGESTIONS[lang].map((suggestion) => (
                     <li key={suggestion}>
                       <button
-                        className="hover:text-pine hover:bg-card flex min-h-12 w-full items-center justify-between gap-3 px-1 text-left"
+                        className="hover:text-pine hover:bg-card flex min-h-12 w-full items-center justify-between gap-3 px-1 text-start"
                         onClick={() => void send(suggestion)}
                       >
                         {suggestion}
@@ -194,7 +202,7 @@ export default function ChatView(props: Props) {
               </div>
             ))}
             {busy !== "idle" && (
-              <Loading label={busy === "sending" ? "Checking the menu…" : "Opening conversation…"} />
+              <Loading label={busy === "sending" ? t.checking : t.openingChat} />
             )}
             {error && <ErrorBanner message={error} />}
             <div ref={bottom} />
@@ -207,7 +215,7 @@ export default function ChatView(props: Props) {
         >
           <div className="mx-auto flex max-w-2xl gap-2">
             <label className="sr-only" htmlFor="message">
-              Message
+              {t.message}
             </label>
             <input
               id="message"
@@ -215,26 +223,25 @@ export default function ChatView(props: Props) {
               className="field"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="e.g. something light, no dairy…"
+              placeholder={t.placeholder}
+              dir="auto"
               maxLength={1000}
               autoComplete="off"
               enterKeyHint="send"
             />
             <button className="btn btn-primary px-5" disabled={!draft.trim() || busy !== "idle"}>
-              Send
+              {t.send}
             </button>
           </div>
         </form>
       </section>
 
-      <aside className="border-line hidden overflow-y-auto border-l p-4 xl:block">
+      <aside className="border-line hidden overflow-y-auto border-s p-4 xl:block">
         <h2 className="font-display border-ink border-b pb-1.5 text-lg font-semibold">
-          What I remember
+          {t.remember}
         </h2>
         {live.length === 0 ? (
-          <p className="text-muted mt-2 text-sm">
-            Nothing yet. Preferences you mention will show up here straight away.
-          </p>
+          <p className="text-muted mt-2 text-sm">{t.rememberEmpty}</p>
         ) : (
           <ul className="divide-line divide-y">
             {live.map((preference) => (
@@ -249,10 +256,10 @@ export default function ChatView(props: Props) {
                   className="mt-0.5"
                 />
                 <span>
-                  {preferenceText(preference)}
+                  {preferenceText(preference, lang)}
                   {(preference.status === "pending" || preference.removal_requested) && (
                     <span className="text-ember block text-xs font-semibold">
-                      Waiting for your confirmation
+                      {t.waiting}
                     </span>
                   )}
                 </span>
@@ -261,7 +268,7 @@ export default function ChatView(props: Props) {
           </ul>
         )}
         <a className="btn-text mt-2" href="#preferences">
-          Review and edit
+          {t.review}
           <Icon name="arrow" />
         </a>
       </aside>

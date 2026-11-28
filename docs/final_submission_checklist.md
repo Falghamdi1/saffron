@@ -79,6 +79,18 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
 | Scope and trade-offs, alternatives, what next | 9:20 | Not implemented (not recorded) |
 | Results and validation | 8:20 | Not implemented (not recorded) |
 
+## Arabic support (additional brief)
+
+| Requirement | Verification | Status |
+| --- | --- | --- |
+| Arabic and English conversations | `tests/test_arabic.py` with rules and a scripted model | Partially verified: not tried with Gemini |
+| Language detected automatically; replies match | same | Partially verified |
+| Manual language switch | browser | Verified |
+| Right-to-left interface | screenshots at phone and desktop widths | Partially verified: emulated, no real device |
+| Bilingual menu names, descriptions, ingredients | test that every dish has them | Partially verified: wording not reviewed |
+| Same prices, allergens and diets in both | single menu record; test | Verified |
+| One memory across languages | cross-language tests; browser | Verified |
+
 ## Interface quality
 
 | Check | Method | Status |
@@ -94,12 +106,13 @@ after `7e648df`, including the redesigned interface, is **not yet deployed**.
    (10 `PASS` lines; before the reset, "language model is in use" fails).
 2. While signed in on the live site, open Menu or My preferences and reload: you should stay
    signed in on that section. This was only tried in local mode.
-3. In a private window, create a new account on the live site, state an allergy, sign out,
+3. Say an Arabic sesame allergy on the live site and check the suggestions avoid sesame.
+4. In a private window, create a new account on the live site, state an allergy, sign out,
    sign in, start a new conversation and confirm it applies. Try the sesame sentence about
    another person.
-4. Check the site on a real phone.
-5. Set the `APP_URL` repository variable and run **Keep alive** once.
-6. Record the video and upload it to the Drive folder with the URL, repository link and
+5. Check the site on a real phone.
+6. Set the `APP_URL` repository variable and run **Keep alive** once.
+7. Record the video and upload it to the Drive folder with the URL, repository link and
    access notes.
-7. Open every link from a signed-out browser.
-8. Confirm the deadline in HR's message.
+8. Open every link from a signed-out browser.
+9. Confirm the deadline in HR's message.

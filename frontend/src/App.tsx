@@ -3,10 +3,26 @@ import { createApi } from "./api";
 import { ErrorBanner, Loading } from "./components/Feedback";
 import SignIn from "./components/SignIn";
 import Workspace from "./components/Workspace";
+import { applyLanguage, initialLanguage, LanguageContext, useLanguage } from "./i18n";
 import { createSession, type Session } from "./session";
 import type { AppConfig } from "./types";
 
 export default function App() {
+  const [lang, setLang] = useState(initialLanguage);
+  useEffect(() => applyLanguage(lang), [lang]);
+  const language = useMemo(
+    () => ({ lang, toggle: () => setLang(lang === "en" ? "ar" : "en") }),
+    [lang],
+  );
+  return (
+    <LanguageContext.Provider value={language}>
+      <Screen />
+    </LanguageContext.Provider>
+  );
+}
+
+function Screen() {
+  const { t } = useLanguage();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -39,12 +55,12 @@ export default function App() {
   if (failed) {
     return (
       <main className="mx-auto max-w-md p-6 pt-24">
-        <ErrorBanner message="Saffron is not responding." onRetry={() => void start()} />
+        <ErrorBanner message={t.notResponding} onRetry={() => void start()} />
       </main>
     );
   }
   if (!config || !session || !api || signedIn === null) {
-    return <Loading label="Opening the kitchen. A first visit can take up to a minute." />;
+    return <div className="mx-auto max-w-md p-6"><Loading label={t.opening} /></div>;
   }
   if (!signedIn) {
     return <SignIn config={config} session={session} onSignedIn={() => setSignedIn(true)} />;

@@ -21,6 +21,12 @@ Defined once in [`frontend/src/index.css`](../frontend/src/index.css).
 | Fraunces, Figtree | dish names and headings; everything else |
 | 6 px, 10 px | radius of controls and of panels; nothing is pill-shaped |
 
+## Arabic
+
+Choosing Arabic sets `dir="rtl"` on the page; spacing and borders use start and end rather
+than left and right, arrows mirror, and Arabic text falls through to Noto Naskh Arabic for
+headings and IBM Plex Sans Arabic for body text. Prices use Western digits in both languages.
+
 ## Rules
 
 - One primary button in a view. Others are outlined or plain text actions.

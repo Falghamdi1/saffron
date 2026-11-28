@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { currentLanguage, STRINGS } from "./i18n";
 import type { AppConfig } from "./types";
 
 // Per-tab storage in local mode, so two tabs can demonstrate two separate diners.
@@ -22,7 +23,7 @@ function localSession(): Session {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!response.ok) throw new Error("Use letters, numbers and spaces for your name.");
+      if (!response.ok) throw new Error(STRINGS[currentLanguage()].nameRule);
       sessionStorage.setItem(LOCAL_KEY, (await response.json()).access_token);
     },
     async signUp(name) {
@@ -43,12 +44,13 @@ function supabaseSession(client: SupabaseClient): Session {
     },
     async signIn(email, password) {
       const { error } = await client.auth.signInWithPassword({ email, password });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(STRINGS[currentLanguage()].signInFailed || error.message);
     },
     async signUp(email, password) {
       const { data, error } = await client.auth.signUp({ email, password });
-      if (error) throw new Error(error.message);
-      return data.session ? null : "Check your email to confirm the account, then sign in.";
+      const strings = STRINGS[currentLanguage()];
+      if (error) throw new Error(strings.signInFailed || error.message);
+      return data.session ? null : strings.confirmEmail;
     },
     async signOut() {
       await client.auth.signOut();

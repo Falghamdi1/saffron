@@ -25,7 +25,8 @@ export default function Icon({ name, filled = false, className = "" }: Props) {
       strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`size-4 shrink-0 ${className}`}
+      // An arrow points the way the text reads.
+      className={`size-4 shrink-0 ${name === "arrow" ? "rtl:-scale-x-100" : ""} ${className}`}
     >
       <path d={PATHS[name]} />
     </svg>

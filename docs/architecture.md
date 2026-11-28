@@ -69,6 +69,20 @@ these safeguards before the policy sees anything:
 Any HTTP error, timeout or invalid response falls back to the rules, and the interface says
 so. The log records which engine read each turn, never the message.
 
+## Languages
+
+Preferences are canonical keys such as `sesame` or `spice: hot`, never the words used.
+
+- `language.py` normalises Arabic spelling and digits and maps Arabic words to the keys.
+- `understanding/arabic.py` is the Arabic counterpart of the rules; Gemini is told to return
+  English values and to quote evidence in the original language.
+- The quote check, attribution and hedging safeguards work on both languages.
+- An allergy that cannot be identified is kept as pending and no dish is suggested until the
+  diner picks it from the list. Without this, an unrecognised word would filter nothing.
+- `i18n.py` holds every sentence in both languages. A reply follows the language of the
+  message; the interface language is the diner's choice.
+- Filtering and ranking read only the English menu fields. Arabic fields are display text.
+
 ## Memory
 
 `memory/policy.py` is a pure function: candidate plus current records in, changes and

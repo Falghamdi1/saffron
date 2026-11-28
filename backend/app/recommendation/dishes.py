@@ -2,6 +2,7 @@
 
 import re
 
+from app import language
 from app.schemas import MenuItem
 
 GENERIC_WORDS = {
@@ -19,7 +20,7 @@ NOT_DISH_NAMES = {
 
 
 def _words(text: str) -> str:
-    return " " + " ".join(re.findall(r"[a-z']+", text.lower())) + " "
+    return " " + " ".join(re.findall(r"[a-z'\u0621-\u064a]+", language.fold(text))) + " "
 
 
 def _aliases(items: list[MenuItem]) -> dict[str, list[str]]:
@@ -31,6 +32,8 @@ def _aliases(items: list[MenuItem]) -> dict[str, list[str]]:
     aliases = {}
     for item in items:
         names = [_words(item.name).strip(), item.id.replace("-", " ")]
+        if item.name_ar:
+            names.append(_words(item.name_ar).strip())
         names += [
             word for word in _words(item.name).split()
             if len(owners[word]) == 1 and word not in GENERIC_WORDS and len(word) > 3

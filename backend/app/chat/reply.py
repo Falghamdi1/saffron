@@ -4,43 +4,32 @@ Every dish name, price and allergen fact here is copied from menu records chosen
 the recommender. No language model writes this text, so it cannot invent a dish.
 """
 
+from app.i18n import join, name, say
 from app.recommendation.engine import Profile
 from app.schemas import Exclusion, MemoryNote, MenuItem
-from app.vocabulary import ALLERGENS, label
-
-HELP = (
-    "Tell me what you feel like eating, anything you can't have, or a budget. "
-    "You can also ask me to compare two dishes."
-)
+from app.vocabulary import ALLERGENS
 
 
-def _join(parts: list[str]) -> str:
-    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
+def dish_name(item: MenuItem, lang: str) -> str:
+    return item.name_ar if lang == "ar" and item.name_ar else item.name
 
 
 def safety_notice(profile: Profile) -> str:
+    lang = profile.language
     allergies = sorted(profile.allergies | profile.unconfirmed_allergies)
     if not allergies:
         return ""
-    notice = (
-        f"Checked against recorded ingredient and “may contain” data for "
-        f"{_join([label(a) for a in allergies])}. This cannot rule out cross-contact in the "
-        "kitchen, so please tell your server about the allergy."
-    )
-    untracked = [a for a in allergies if a not in ALLERGENS]
+    notice = say(lang, "notice", allergies=join([name(a, lang) for a in allergies], lang))
+    untracked = [name(a, lang) for a in allergies if a not in ALLERGENS]
     if untracked:
-        notice += (
-            f" {_join(untracked).capitalize()} is not a formally tracked allergen here: only "
-            "ingredient names were checked."
-        )
+        names = join(untracked, lang)
+        names = names.capitalize() if lang == "en" else names
+        notice += " " + say(lang, "untracked", names=names)
     return notice
 
 
-def table_allergies(allergies: list[str]) -> str:
-    return (
-        f"For this chat only, I'm also avoiding {_join([label(a) for a in allergies])}. It is "
-        "not saved to your preferences; if it is your own allergy, tell me “I'm allergic to …”."
-    )
+def table_allergies(allergies: list[str], lang: str) -> str:
+    return say(lang, "table", allergies=join([name(a, lang) for a in allergies], lang))
 
 
 def acknowledgement(notes: list[MemoryNote]) -> str:
@@ -48,62 +37,67 @@ def acknowledgement(notes: list[MemoryNote]) -> str:
 
 
 def recommendations(
-    names: list[str], excluded: list[Exclusion], unmatched: list[str], cheaper: bool
+    items: list[MenuItem],
+    excluded: list[Exclusion],
+    unmatched: list[str],
+    cheaper: bool,
+    lang: str,
 ) -> str:
     parts = []
     if unmatched:
-        parts.append(f"I couldn't find an option with {_join(unmatched)} that fits.")
-    if not names:
-        parts.append(
-            "Nothing cheaper fits your requirements." if cheaper else
-            "Nothing on the menu meets all of your requirements right now. "
-            "I won't relax an allergy or diet, but you could raise the budget or change the course."
-        )
+        wants = join([name(w, lang) for w in unmatched], lang)
+        parts.append(say(lang, "unmatched", wants=wants))
+    if not items:
+        parts.append(say(lang, "nothing_cheaper" if cheaper else "nothing"))
         return " ".join(parts)
-    lead = "Here is" if len(names) == 1 else "Here are"
-    parts.append(f"{lead} {_join(names)}.")
+    names = join([dish_name(i, lang) for i in items], lang)
+    parts.append(say(lang, "here_one" if len(items) == 1 else "here_many", names=names))
     if excluded:
         count = len(excluded)
-        parts.append(
-            f"I left out {count} dish{'es' if count > 1 else ''} that "
-            f"{'break' if count > 1 else 'breaks'} one of your requirements."
-        )
+        key = "left_out_one" if count == 1 else "left_out_many"
+        parts.append(say(lang, key, count=count))
     return " ".join(parts)
 
 
-def earlier_limit(amount: float) -> str:
-    return f"I'm still keeping to the SAR {amount:g} limit you gave earlier in this chat."
+def earlier_limit(amount: float, lang: str) -> str:
+    return say(lang, "earlier_limit", amount=f"{amount:g}")
 
 
-def dish_facts(checked: list[tuple[MenuItem, list[str]]]) -> str:
+def dish_facts(checked: list[tuple[MenuItem, list[str]]], lang: str) -> str:
+    separator = "، " if lang == "ar" else ", "
     sentences = []
     for item, problems in checked:
-        listed = _join([label(a) for a in item.allergens]) if item.allergens else "none recorded"
-        sentence = (
-            f"{item.name} is SAR {item.price:g}. Ingredients: {', '.join(item.ingredients)}. "
-            f"Allergens: {listed}."
+        ingredients = item.ingredients_ar if lang == "ar" else item.ingredients
+        listed = (
+            join([name(a, lang) for a in item.allergens], lang)
+            if item.allergens else say(lang, "none_recorded")
+        )
+        sentence = say(
+            lang, "facts", name=dish_name(item, lang), price=f"{item.price:g}",
+            ingredients=separator.join(ingredients), allergens=listed,
         )
         if item.may_contain:
-            sentence += f" May contain {_join([label(a) for a in item.may_contain])}."
+            may = join([name(a, lang) for a in item.may_contain], lang)
+            sentence += " " + say(lang, "may_contain", allergens=may)
         if not item.allergen_info_complete:
-            sentence += " Its allergen information is incomplete."
+            sentence += " " + say(lang, "incomplete")
         if problems:
-            sentence += f" I don't recommend it for you: {'; '.join(problems)}."
+            sentence += " " + say(lang, "not_for_you", problems="; ".join(problems))
         sentences.append(sentence)
     return " ".join(sentences)
 
 
-def comparison(checked: list[tuple[MenuItem, list[str]]]) -> str:
+def comparison(checked: list[tuple[MenuItem, list[str]]], lang: str) -> str:
     cheapest = min(checked, key=lambda pair: pair[0].price)[0]
-    text = (
-        f"Here are {_join([item.name for item, _ in checked])} side by side. "
-        f"{cheapest.name} is the least expensive."
+    text = say(
+        lang, "compare",
+        names=join([dish_name(item, lang) for item, _ in checked], lang),
+        cheapest=dish_name(cheapest, lang),
     )
-    blocked = [f"{item.name} ({'; '.join(problems)})" for item, problems in checked if problems]
+    blocked = [
+        f"{dish_name(item, lang)} ({'; '.join(problems)})"
+        for item, problems in checked if problems
+    ]
     if blocked:
-        text += f" Not suitable for you: {_join(blocked)}."
+        text += " " + say(lang, "unsuitable", dishes=join(blocked, lang))
     return text
-
-
-def unknown_dish(name: str) -> str:
-    return f"“{name}” isn't on our menu, so I can't tell you anything about it."

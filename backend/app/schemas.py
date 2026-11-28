@@ -27,6 +27,10 @@ class MenuItem(BaseModel):
     diets: list[str]
     available: bool = True
     allergen_info_complete: bool = True
+    # Display text only. Rules always read the English fields above.
+    name_ar: str = ""
+    description_ar: str = ""
+    ingredients_ar: list[str] = Field(default_factory=list)
 
 
 class Candidate(BaseModel):

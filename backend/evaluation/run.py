@@ -227,6 +227,15 @@ INCOMPLETE = """## Incomplete and failed runs
   part-way through the scenarios. The phrasing and attribution sets finished before that.
 """
 
+ARABIC = """## Arabic
+
+Arabic is covered by `tests/test_arabic.py` (rules and a scripted model): canonical values,
+attribution, unidentified allergens, replies and memory shared with English. The constraint
+sweep works on canonical values, so it applies to both languages. No Arabic sentences are in
+the scored sets, Gemini has not been run on Arabic, and the Gemini results above were
+measured before its instruction was extended for Arabic.
+"""
+
 NOT_COVERED = """## Not covered by this report
 
 - The browser interface. It has no automated tests; screens were checked by hand.
@@ -377,7 +386,7 @@ def render(
     for result in results:
         outcome = "Pass" if result["passed"] else f"**Fail**: {result['detail']}"
         lines.append(f"| {result['area']} | {result['title']} | {outcome} |")
-    lines += ["", INCOMPLETE, NOT_COVERED]
+    lines += ["", ARABIC, INCOMPLETE, NOT_COVERED]
     text = "\n".join(lines)
     return re.sub(r"\n{3,}", "\n\n", text).rstrip() + "\n"
 

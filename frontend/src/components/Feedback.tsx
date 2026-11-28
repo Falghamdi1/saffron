@@ -1,6 +1,7 @@
+import { useLanguage } from "../i18n";
 import Icon from "./Icons";
 
-export function Loading({ label = "Loading…" }: { label?: string }) {
+export function Loading({ label }: { label: string }) {
   return (
     <div role="status" className="text-muted flex items-center gap-3 py-4 text-sm">
       <span
@@ -13,6 +14,7 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
 }
 
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useLanguage();
   return (
     <div
       role="alert"
@@ -22,7 +24,7 @@ export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: (
       <span className="flex-1">{message}</span>
       {onRetry && (
         <button className="min-h-10 shrink-0 font-semibold underline" onClick={onRetry}>
-          Try again
+          {t.retry}
         </button>
       )}
     </div>

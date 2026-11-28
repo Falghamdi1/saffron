@@ -12,6 +12,9 @@ export interface MenuItem {
   diets: string[];
   available: boolean;
   allergen_info_complete: boolean;
+  name_ar: string;
+  description_ar: string;
+  ingredients_ar: string[];
 }
 
 export type MenuEntry = MenuItem & { violations: string[] };

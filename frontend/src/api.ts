@@ -1,3 +1,4 @@
+import { currentLanguage, STRINGS } from "./i18n";
 import type { Session } from "./session";
 import type { Conversation, Memory, MemoryAction, MenuEntry, Message } from "./types";
 
@@ -24,7 +25,7 @@ export function createApi(session: Session, onUnauthorised: () => void) {
         body: body ? JSON.stringify(body) : undefined,
       });
     } catch {
-      throw new ApiError("We can't reach the kitchen. Check your connection and try again.", 0);
+      throw new ApiError(STRINGS[currentLanguage()].offline, 0);
     }
     if (response.status === 401) onUnauthorised();
     if (!response.ok) {
@@ -32,8 +33,11 @@ export function createApi(session: Session, onUnauthorised: () => void) {
         .json()
         .then((data) => data.detail)
         .catch(() => null);
+      const lang = currentLanguage();
+      // Server messages are English, so Arabic readers get a translated equivalent.
+      const known = response.status === 429 ? STRINGS[lang].tooFast : STRINGS[lang].wrong;
       throw new ApiError(
-        typeof detail === "string" ? detail : "Something went wrong. Please try again.",
+        lang === "en" && typeof detail === "string" ? detail : known,
         response.status,
       );
     }
@@ -48,14 +52,15 @@ export function createApi(session: Session, onUnauthorised: () => void) {
       }),
     conversations: () => request<Conversation[]>("/conversations"),
     messages: (id: string) => request<Message[]>(`/conversations/${id}/messages`),
-    menu: () => request<MenuEntry[]>("/menu"),
+    menu: () => request<MenuEntry[]>(`/menu?lang=${currentLanguage()}`),
     memory: () => request<Memory>("/memory"),
     changeMemory: (id: string, action: MemoryAction) =>
       action === "forget"
         ? request<Memory>(`/memory/${id}`, "DELETE")
         : request<Memory>(`/memory/${id}/${action}`, "POST"),
     addAllergy: (allergen: string) => request<Memory>("/memory/allergies", "POST", { allergen }),
-    addFavourite: (itemId: string) => request<unknown>(`/favorites/${itemId}`, "POST"),
+    addFavourite: (itemId: string) =>
+      request<unknown>(`/favorites/${itemId}?lang=${currentLanguage()}`, "POST"),
   };
 }
 

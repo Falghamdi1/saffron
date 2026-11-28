@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useLanguage } from "../i18n";
 import type { Session } from "../session";
 import type { AppConfig } from "../types";
 import { ErrorBanner } from "./Feedback";
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function SignIn({ config, session, onSignedIn }: Props) {
+  const { t, toggle } = useLanguage();
   const local = config.auth_mode === "local";
   const [creating, setCreating] = useState(false);
   const [identifier, setIdentifier] = useState("");
@@ -42,40 +44,38 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
     }
   }
 
-  const action = creating ? "Create account" : local ? "Start ordering" : "Sign in";
+  const action = creating ? t.create : local ? t.start : t.signIn;
 
   return (
     <main className="grid min-h-dvh content-start lg:grid-cols-[1.1fr_1fr] lg:content-stretch">
       <section className="bg-pine text-paper flex flex-col justify-between gap-6 px-6 py-8 lg:p-14">
-        <p className="font-display text-saffron text-2xl font-semibold" translate="no">
-          Saffron
-        </p>
+        <div className="on-pine flex items-center justify-between gap-4">
+          <p className="font-display text-saffron text-2xl font-semibold" translate="no">
+            Saffron
+          </p>
+          <button type="button" className="min-h-11 text-sm underline-offset-4 hover:underline" onClick={toggle}>
+            {t.switchTo}
+          </button>
+        </div>
         <div className="max-w-md">
           <h1 className="font-display text-3xl leading-tight font-semibold lg:text-5xl">
-            A table that remembers how you eat.
+            {t.tagline}
           </h1>
-          <p className="text-paper/85 mt-4">
-            Tell us once about your allergies, tastes and budget. Next time the suggestions already
-            fit, and you can see and correct everything we remember.
-          </p>
+          <p className="text-paper/85 mt-4">{t.intro}</p>
         </div>
-        <p className="text-paper/75 hidden text-sm lg:block">
-          Levantine, Gulf, Indian and Mediterranean kitchen
-        </p>
+        <p className="text-paper/75 hidden text-sm lg:block">{t.kitchen}</p>
       </section>
 
       <section className="flex items-center justify-center px-6 py-8">
         <form onSubmit={submit} className="w-full max-w-sm space-y-4">
           <h2 className="font-display text-2xl font-semibold">
-            {local ? "Who is ordering?" : creating ? "Create your account" : "Welcome back"}
+            {local ? t.who : creating ? t.createTitle : t.welcomeBack}
           </h2>
           {local && (
-            <p className="text-muted text-sm">
-              Local demo mode: a name identifies a diner and there is no password.
-            </p>
+            <p className="text-muted text-sm">{t.localNote}</p>
           )}
           <label className="block text-sm font-semibold">
-            {local ? "Your name" : "Email"}
+            {local ? t.yourName : t.email}
             <input
               className="field mt-1 font-normal"
               name={local ? "name" : "email"}
@@ -84,13 +84,14 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
               onChange={(event) => setIdentifier(event.target.value)}
               autoComplete={local ? "off" : "email"}
               spellCheck={false}
+              dir={local ? "auto" : "ltr"}
               maxLength={local ? 40 : 254}
               required
             />
           </label>
           {!local && (
             <label className="block text-sm font-semibold">
-              Password
+              {t.password}
               <input
                 className="field mt-1 font-normal"
                 name="password"
@@ -104,7 +105,7 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
               />
               {creating && (
                 <span id="password-hint" className="text-muted mt-1 block font-normal">
-                  At least 8 characters.
+                  {t.passwordHint}
                 </span>
               )}
             </label>
@@ -116,7 +117,7 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
             </p>
           )}
           <button className="btn btn-primary w-full" disabled={busy}>
-            {busy ? "One moment…" : action}
+            {busy ? t.busy : action}
           </button>
           {!local && (
             <button
@@ -127,7 +128,7 @@ export default function SignIn({ config, session, onSignedIn }: Props) {
                 setError("");
               }}
             >
-              {creating ? "I already have an account" : "New here? Create an account"}
+              {creating ? t.haveAccount : t.newHere}
             </button>
           )}
         </form>

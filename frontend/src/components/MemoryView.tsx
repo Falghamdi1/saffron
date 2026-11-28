@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ALLERGENS, label, preferenceText, when } from "../format";
+import { useLanguage, type Strings } from "../i18n";
 import type { Memory, MemoryAction, Preference } from "../types";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 function AddAllergy({ onAdd }: { onAdd: Props["onAddAllergy"] }) {
+  const { lang, t } = useLanguage();
   const [allergen, setAllergen] = useState("");
   return (
     <form
@@ -21,51 +23,50 @@ function AddAllergy({ onAdd }: { onAdd: Props["onAddAllergy"] }) {
       <select
         className="field w-auto text-sm"
         name="allergen"
-        aria-label="Allergen to add"
+        aria-label={t.allergenToAdd}
         value={allergen}
         onChange={(event) => setAllergen(event.target.value)}
       >
-        <option value="">Add an allergy…</option>
+        <option value="">{t.addAllergy}</option>
         {ALLERGENS.map((value) => (
           <option key={value} value={value}>
-            {label(value)}
+            {label(value, lang)}
           </option>
         ))}
       </select>
       <button className="btn btn-quiet" disabled={!allergen}>
-        Add
+        {t.add}
       </button>
     </form>
   );
 }
 
-const GROUPS: { title: string; categories: string[]; empty: string }[] = [
-  { title: "Allergies", categories: ["allergy"], empty: "None recorded." },
-  { title: "Dietary choices", categories: ["diet"], empty: "None recorded." },
-  { title: "Tastes", categories: ["like", "dislike", "cuisine", "favorite_dish"], empty: "Nothing yet." },
-  { title: "Spice and budget", categories: ["spice", "budget"], empty: "Nothing yet." },
+const GROUPS: { title: keyof Strings; categories: string[]; empty: keyof Strings }[] = [
+  { title: "allergiesGroup", categories: ["allergy"], empty: "noneYet" },
+  { title: "dietGroup", categories: ["diet"], empty: "noneYet" },
+  { title: "tastesGroup", categories: ["like", "dislike", "cuisine", "favorite_dish"], empty: "nothingYet" },
+  { title: "spiceGroup", categories: ["spice", "budget"], empty: "nothingYet" },
 ];
 
-const EVENT_LABELS: Record<string, string> = {
-  created: "Added",
-  proposed: "Suggested",
-  confirmed: "Confirmed",
-  reinforced: "Mentioned again",
-  reaffirmed: "Kept",
-  superseded: "Replaced",
-  retracted: "Removed",
-  removal_requested: "Removal asked",
-  dismissed: "Dismissed",
+const EVENT_LABELS: Record<string, { en: string; ar: string }> = {
+  created: { en: "Added", ar: "أضيف" },
+  proposed: { en: "Suggested", ar: "اقتراح" },
+  confirmed: { en: "Confirmed", ar: "تأكد" },
+  reinforced: { en: "Mentioned again", ar: "ذُكر مجدداً" },
+  reaffirmed: { en: "Kept", ar: "أُبقي" },
+  superseded: { en: "Replaced", ar: "استُبدل" },
+  retracted: { en: "Removed", ar: "حُذف" },
+  removal_requested: { en: "Removal asked", ar: "طُلب حذفه" },
+  dismissed: { en: "Dismissed", ar: "رُفض" },
 };
 
 function Row({ preference, onChange }: { preference: Preference; onChange: Props["onChange"] }) {
+  const { lang, t } = useLanguage();
   const waiting = preference.status === "pending" || preference.removal_requested;
 
   function forget() {
-    const warning =
-      preference.category === "allergy"
-        ? `Remove “${preferenceText(preference)}”? Dishes containing it may be recommended again.`
-        : `Forget “${preferenceText(preference)}”?`;
+    const template = preference.category === "allergy" ? t.forgetAllergy : t.forgetOther;
+    const warning = template.replace("{what}", preferenceText(preference, lang));
     if (window.confirm(warning)) void onChange(preference.id, "forget");
   }
 
@@ -76,35 +77,41 @@ function Row({ preference, onChange }: { preference: Preference; onChange: Props
       }`}
     >
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{preferenceText(preference)}</p>
+        <p className="font-semibold">{preferenceText(preference, lang)}</p>
         <p className="text-muted text-[13px] break-words">
-          {preference.certainty === "confirmed" ? "Confirmed" : "Unconfirmed guess"} ·{" "}
-          {when(preference.updated_at)}
-          {preference.source_text && ` · from “${preference.source_text}”`}
+          {preference.certainty === "confirmed" ? t.confirmed : t.guess} ·{" "}
+          {when(preference.updated_at, lang)}
+          {preference.source_text && (
+            <>
+              {" "}
+              · {t.from} <bdi>“{preference.source_text}”</bdi>
+            </>
+          )}
         </p>
         {preference.removal_requested && (
           <p className="text-ember text-[13px] font-semibold">
-            You mentioned removing this. It stays in force until you confirm.
+            {t.removalNote}
           </p>
         )}
         {preference.status === "pending" && preference.category === "allergy" && (
           <p className="text-ember text-[13px] font-semibold">
-            Avoided as a precaution until you answer.
+            {t.precaution}
           </p>
         )}
       </div>
       {waiting ? (
         <span className="flex shrink-0 gap-2">
           <button className="btn btn-primary" onClick={() => void onChange(preference.id, "confirm")}>
-            {preference.removal_requested ? "Remove it" : "Confirm"}
+            {preference.removal_requested ? t.removeIt : t.confirm}
           </button>
           <button className="btn btn-quiet" onClick={() => void onChange(preference.id, "dismiss")}>
-            {preference.removal_requested ? "Keep it" : "Not right"}
+            {preference.removal_requested ? t.keep : t.notRight}
           </button>
         </span>
       ) : (
         <button className="btn-text shrink-0 self-start sm:self-auto" onClick={forget}>
-          Forget<span className="sr-only">: {preferenceText(preference)}</span>
+          {t.forget}
+          <span className="sr-only">: {preferenceText(preference, lang)}</span>
         </button>
       )}
     </li>
@@ -112,21 +119,20 @@ function Row({ preference, onChange }: { preference: Preference; onChange: Props
 }
 
 export default function MemoryView({ memory, onChange, onAddAllergy }: Props) {
+  const { lang, t } = useLanguage();
   return (
     <div className="h-full overflow-y-auto overscroll-contain">
       <div className="mx-auto grid max-w-5xl gap-10 px-4 py-5 sm:px-6 lg:grid-cols-[1.4fr_1fr]">
         <section>
-          <h1 className="font-display text-3xl font-semibold">What I remember about you</h1>
-          <p className="text-muted mt-1 text-sm">
-            Only you can see this. Correct it here, or just tell me in the chat.
-          </p>
+          <h1 className="font-display text-3xl font-semibold">{t.aboutYou}</h1>
+          <p className="text-muted mt-1 text-sm">{t.private}</p>
           {GROUPS.map((group) => {
             const rows = memory.preferences.filter((p) => group.categories.includes(p.category));
             return (
               <div key={group.title} className="mt-7">
-                <h2 className="section-title">{group.title}</h2>
+                <h2 className="section-title">{t[group.title]}</h2>
                 {rows.length === 0 ? (
-                  <p className="text-muted pt-2 text-sm">{group.empty}</p>
+                  <p className="text-muted pt-2 text-sm">{t[group.empty]}</p>
                 ) : (
                   <ul className="divide-line border-line divide-y border-b">
                     {rows.map((preference) => (
@@ -141,24 +147,28 @@ export default function MemoryView({ memory, onChange, onAddAllergy }: Props) {
         </section>
 
         <section>
-          <h2 className="section-title">How it changed</h2>
+          <h2 className="section-title">{t.changed}</h2>
           {memory.history.length === 0 ? (
-            <p className="text-muted pt-2 text-sm">Changes to your preferences will be listed here.</p>
+            <p className="text-muted pt-2 text-sm">{t.noChanges}</p>
           ) : (
             <ol className="divide-line divide-y">
               {memory.history.map((event) => (
                 <li key={event.id} className="py-2.5 text-sm">
                   <p>
                     <span className="font-semibold">
-                      {EVENT_LABELS[event.event_type] ?? event.event_type}:
+                      {EVENT_LABELS[event.event_type]?.[lang] ?? event.event_type}:
                     </span>{" "}
-                    {preferenceText(event)}
+                    {preferenceText(event, lang)}
                   </p>
                   <p className="text-muted text-[13px]">
-                    {event.reason} · {when(event.created_at)}
+                    {/* Reasons are recorded in English; the event label covers Arabic. */}
+                    {lang === "en" && `${event.reason} · `}
+                    {when(event.created_at, lang)}
                   </p>
                   {event.source_text && (
-                    <p className="text-muted text-[13px] break-words">“{event.source_text}”</p>
+                    <p dir="auto" className="text-muted text-[13px] break-words">
+                      “{event.source_text}”
+                    </p>
                   )}
                 </li>
               ))}

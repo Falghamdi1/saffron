@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from app import language
+from app.i18n import name, say
 from app.schemas import Candidate, Certainty, MemoryNote, Preference, Status
 from app.vocabulary import (
     CUISINES,
@@ -25,7 +26,6 @@ from app.vocabulary import (
     INGREDIENT_GROUPS,
     SPICE_LEVELS,
     allergens_for,
-    label,
     singular,
 )
 
@@ -54,17 +54,14 @@ class Decision:
     notes: list[MemoryNote] = field(default_factory=list)
 
 
-def describe(category: str, value: str) -> str:
-    return {
-        "allergy": f"allergy to {label(value)}",
-        "diet": f"{label(value)} diet",
-        "like": f"likes {value}",
-        "dislike": f"dislikes {value}",
-        "cuisine": f"enjoys {value} cuisine",
-        "spice": f"{value} spice level",
-        "budget": f"budget of SAR {value} per dish",
-        "favorite_dish": f"favourite dish: {value.replace('-', ' ')}",
-    }[category]
+def describe(category: str, value: str, lang: str = "en") -> str:
+    if category == "favorite_dish":
+        shown = value.replace("-", " ")
+    elif category == "budget":
+        shown = value
+    else:
+        shown = name(value, lang)
+    return say(lang, f"d_{category}", value=shown)
 
 
 def unidentified(value: str) -> bool:
@@ -126,7 +123,7 @@ def normalize(candidate: Candidate) -> list[Candidate]:
     return [candidate.model_copy(update={"value": value}) for value in values]
 
 
-def decide(candidate: Candidate, memory: list[Preference]) -> Decision:
+def decide(candidate: Candidate, memory: list[Preference], lang: str = "en") -> Decision:
     """Decide the effect of one normalized candidate on the current memory."""
     live = [p for p in memory if p.status in ("active", "pending")]
     match = next(
@@ -134,18 +131,18 @@ def decide(candidate: Candidate, memory: list[Preference]) -> Decision:
         None,
     )
     if candidate.scope == "temporary" and candidate.category != "allergy":
-        verb = "Using" if candidate.operation == "assert" else "Setting aside"
-        note = f"{verb} “{describe(candidate.category, candidate.value)}” for this chat only."
+        key = "temporary_use" if candidate.operation == "assert" else "temporary_drop"
+        note = say(lang, key, what=describe(candidate.category, candidate.value, lang))
         return Decision(notes=[MemoryNote(kind="temporary", message=note)])
     if candidate.operation == "retract":
-        return _retract(candidate, match)
-    return _assert(candidate, match, live)
+        return _retract(candidate, match, lang)
+    return _assert(candidate, match, live, lang)
 
 
-def _retract(candidate: Candidate, match: Preference | None) -> Decision:
+def _retract(candidate: Candidate, match: Preference | None, lang: str) -> Decision:
     if match is None:
         return Decision()
-    text = describe(match.category, match.value)
+    text = describe(match.category, match.value, lang)
     if match.category == "allergy" or (
         match.category == "diet" and candidate.certainty == "uncertain"
     ):
@@ -155,7 +152,7 @@ def _retract(candidate: Candidate, match: Preference | None) -> Decision:
         )
         note = MemoryNote(
             kind="needs_confirmation",
-            message=f"I've kept your {text}. Please confirm before I remove it.",
+            message=say(lang, "kept", what=text),
             preference_id=match.id,
         )
         return Decision([change], [note])
@@ -165,19 +162,21 @@ def _retract(candidate: Candidate, match: Preference | None) -> Decision:
         "update", "retracted", "You said this no longer applies",
         match.category, match.value, match.id, status="retracted",
     )
-    return Decision([change], [MemoryNote(kind="removed", message=f"Removed: {text}.")])
+    return Decision([change], [MemoryNote(kind="removed", message=say(lang, "removed", what=text))])
 
 
-def _assert(candidate: Candidate, match: Preference | None, live: list[Preference]) -> Decision:
+def _assert(
+    candidate: Candidate, match: Preference | None, live: list[Preference], lang: str
+) -> Decision:
     category, value = candidate.category, candidate.value
     explicit = candidate.certainty == "explicit"
 
-    conflict = _blocking_conflict(candidate, live)
+    conflict = _blocking_conflict(candidate, live, lang)
     if conflict:
         return Decision(notes=[MemoryNote(kind="conflict", message=conflict)])
 
     decision = Decision()
-    text = describe(category, value)
+    text = describe(category, value, lang)
 
     if match and match.status == "active":
         if match.removal_requested:
@@ -200,11 +199,7 @@ def _assert(candidate: Candidate, match: Preference | None, live: list[Preferenc
                 category, value, status="pending", certainty="inferred",
             ))
         decision.notes.append(MemoryNote(
-            kind="conflict",
-            message=(
-                f"I couldn't tell which allergen “{value}” is, so I won't suggest dishes yet. "
-                "Choose it under My preferences with “Add an allergy”, then dismiss this one."
-            ),
+            kind="conflict", message=say(lang, "unidentified", value=value)
         ))
         return decision
 
@@ -214,12 +209,10 @@ def _assert(candidate: Candidate, match: Preference | None, live: list[Preferenc
                 "create", "proposed", "Inferred from an uncertain statement",
                 category, value, status="pending", certainty="inferred",
             ))
-        extra = (
-            " Until you confirm, I'll avoid it to be safe." if category == "allergy" else ""
-        )
+        extra = " " + say(lang, "ask_avoid") if category == "allergy" else ""
         decision.notes.append(MemoryNote(
             kind="needs_confirmation",
-            message=f"Should I remember this: {text}?{extra}",
+            message=say(lang, "ask", what=text) + extra,
             preference_id=match.id if match else None,
         ))
         return decision
@@ -243,12 +236,13 @@ def _assert(candidate: Candidate, match: Preference | None, live: list[Preferenc
         ))
 
     if replaced:
-        previous = ", ".join(describe(p.category, p.value) for p in replaced)
+        separator = "، " if lang == "ar" else ", "
+        previous = separator.join(describe(p.category, p.value, lang) for p in replaced)
         decision.notes.append(MemoryNote(
-            kind="updated", message=f"Updated: {text} (was: {previous})."
+            kind="updated", message=say(lang, "updated", what=text, previous=previous)
         ))
     else:
-        decision.notes.append(MemoryNote(kind="saved", message=f"Remembered: {text}."))
+        decision.notes.append(MemoryNote(kind="saved", message=say(lang, "saved", what=text)))
     return decision
 
 
@@ -268,7 +262,9 @@ def _is_replaced_by(old: Preference, category: str, value: str) -> bool:
     return False
 
 
-def _blocking_conflict(candidate: Candidate, live: list[Preference]) -> str | None:
+def _blocking_conflict(
+    candidate: Candidate, live: list[Preference], lang: str
+) -> str | None:
     """A liked food must not silently contradict an allergy or a diet."""
     if candidate.category != "like":
         return None
@@ -276,10 +272,7 @@ def _blocking_conflict(candidate: Candidate, live: list[Preference]) -> str | No
     allergies = {p.value for p in active if p.category == "allergy"}
     food = candidate.value
     if food in allergies or allergies & set(allergens_for(food)):
-        return (
-            f"You have an allergy on record that covers {food}, so I haven't added it "
-            "as a favourite. Your allergy protection stays in place."
-        )
+        return say(lang, "allergy_conflict", food=name(food, lang))
     diets = {p.value for p in active if p.category == "diet"}
     foods = {food, *INGREDIENT_GROUPS.get(food, ())}
     clashes = (
@@ -288,8 +281,5 @@ def _blocking_conflict(candidate: Candidate, live: list[Preference]) -> str | No
     )
     if clashes:
         diet = next(d for d in EATING_PATTERNS if d in diets)
-        return (
-            f"You're saved as {diet}, which doesn't include {food}. If that has changed, "
-            f"tell me “I'm no longer {diet}”."
-        )
+        return say(lang, "diet_conflict", diet=name(diet, lang), food=name(food, lang))
     return None

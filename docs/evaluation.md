@@ -134,6 +134,14 @@ Fixed, with tests unless noted:
 | quality | An earlier dish question does not shape later requests | Pass |
 | robustness | Every dish shown is exactly the menu record, with its real price | Pass |
 
+## Arabic
+
+Arabic is covered by `tests/test_arabic.py` (rules and a scripted model): canonical values,
+attribution, unidentified allergens, replies and memory shared with English. The constraint
+sweep works on canonical values, so it applies to both languages. No Arabic sentences are in
+the scored sets, Gemini has not been run on Arabic, and the Gemini results above were
+measured before its instruction was extended for Arabic.
+
 ## Incomplete and failed runs
 
 - 2026-11-27, complete run with Gemini: 29/30 scenarios with no model call failing. The one

@@ -1,4 +1,5 @@
-import { label, price, SPICE_NAMES } from "../format";
+import { dishText, label, list, price, spiceName } from "../format";
+import { useLanguage } from "../i18n";
 import type { MenuItem } from "../types";
 import Icon from "./Icons";
 
@@ -8,28 +9,35 @@ interface Props {
 }
 
 export default function CompareTable({ items, violations }: Props) {
+  const { lang, t } = useLanguage();
   const rows: [string, (item: MenuItem) => string][] = [
-    ["Price", (item) => price(item.price)],
-    ["Spice", (item) => SPICE_NAMES[item.spice_level]],
+    [t.price, (item) => price(item.price, lang)],
+    [t.spice, (item) => spiceName(item.spice_level, lang)],
     [
-      "Allergens",
+      t.allergens,
       (item) =>
         item.allergen_info_complete
-          ? item.allergens.map(label).join(", ") || "none recorded"
-          : "information incomplete",
+          ? list(item.allergens, lang) || t.noneRecorded
+          : t.incompleteInfo,
     ],
-    ["May contain", (item) => item.may_contain.map(label).join(", ") || "none recorded"],
-    ["Diets", (item) => item.diets.map(label).join(", ") || "none listed"],
-    ["Ingredients", (item) => item.ingredients.join(", ")],
-    ["Cuisine", (item) => item.cuisine.charAt(0).toUpperCase() + item.cuisine.slice(1)],
-    ["Available", (item) => (item.available ? "Yes" : "Not today")],
+    [t.mayContainHead, (item) => list(item.may_contain, lang) || t.noneRecorded],
+    [t.diets, (item) => list(item.diets, lang) || t.noneListed],
+    [t.ingredients, (item) => dishText(item, lang).ingredients.join(lang === "ar" ? "، " : ", ")],
+    [
+      t.cuisine,
+      (item) => {
+        const name = label(item.cuisine, lang);
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      },
+    ],
+    [t.available, (item) => (item.available ? t.yes : t.notToday)],
   ];
-  const head = "bg-card sticky left-0 p-2 text-left align-top font-semibold sm:p-3";
+  const head = "bg-card sticky start-0 p-2 text-start align-top font-semibold sm:p-3";
   const cell = "min-w-20 p-2 align-top sm:min-w-24 sm:p-3";
 
   return (
     <div className="border-line bg-card rounded-panel overflow-x-auto border">
-      <table className="w-full text-left text-[13px] tabular-nums sm:text-sm">
+      <table className="w-full text-start text-[13px] tabular-nums sm:text-sm">
         <thead>
           <tr className="border-ink border-b">
             <td className={head} />
@@ -39,7 +47,7 @@ export default function CompareTable({ items, violations }: Props) {
                 scope="col"
                 className={`font-display text-sm font-semibold sm:text-base ${cell}`}
               >
-                {item.name}
+                {dishText(item, lang).name}
               </th>
             ))}
           </tr>
@@ -48,7 +56,7 @@ export default function CompareTable({ items, violations }: Props) {
           {violations && (
             <tr>
               <th scope="row" className={head}>
-                For you
+                {t.forYou}
               </th>
               {items.map((item, index) => {
                 const problems = violations[index] ?? [];
@@ -56,7 +64,7 @@ export default function CompareTable({ items, violations }: Props) {
                   <td key={item.id} className={cell}>
                     <span className={`flex gap-1.5 ${problems.length ? "text-alert" : "text-herb"}`}>
                       <Icon name={problems.length ? "warning" : "check"} className="mt-0.5" />
-                      {problems.join("; ") || "Fits your requirements"}
+                      <bdi>{problems.join("; ") || t.fits}</bdi>
                     </span>
                   </td>
                 );

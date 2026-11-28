@@ -6,8 +6,9 @@
  * Radius: 6px for controls, 10px for the few real panels. Nothing is pill-shaped.
  */
 @theme {
-  --font-display: "Fraunces", Georgia, serif;
-  --font-sans: "Figtree", system-ui, sans-serif;
+  /* The Latin faces have no Arabic glyphs, so Arabic falls through to its own pair. */
+  --font-display: "Fraunces", "Noto Naskh Arabic", Georgia, serif;
+  --font-sans: "Figtree", "IBM Plex Sans Arabic", system-ui, sans-serif;
 
   --color-paper: #f7f5ef;
   --color-card: #fffefb;

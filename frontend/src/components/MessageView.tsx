@@ -1,3 +1,4 @@
+import { useLanguage } from "../i18n";
 import type { MemoryAction, MemoryNote, Memory, Message } from "../types";
 import CompareTable from "./CompareTable";
 import DishEntry from "./DishEntry";
@@ -21,11 +22,12 @@ const NOTE_ICONS: Record<MemoryNote["kind"], "note" | "info" | "warning"> = {
 };
 
 export default function MessageView({ message, memory, dishActions, onChangeMemory }: Props) {
+  const { t } = useLanguage();
   if (message.role === "user") {
     return (
-      <p className="bg-pine text-paper rounded-panel ml-auto w-fit max-w-[85%] px-4 py-2.5 break-words">
-        <span className="sr-only">You said: </span>
-        {message.content}
+      <p className="bg-pine text-paper rounded-panel ms-auto w-fit max-w-[85%] px-4 py-2.5 break-words">
+        <span className="sr-only">{t.youSaid}</span>
+        <bdi>{message.content}</bdi>
       </p>
     );
   }
@@ -49,7 +51,7 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
   return (
     <div className="flex flex-col gap-3">
       {memory_notes.length > 0 && (
-        <ul className="border-line divide-line divide-y border-y text-sm" aria-label="Memory updates">
+        <ul className="border-line divide-line divide-y border-y text-sm" aria-label={t.memoryUpdates}>
           {memory_notes.map((note) => {
             const preference = awaiting(note.preference_id);
             return (
@@ -61,20 +63,20 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
               >
                 <Icon name={NOTE_ICONS[note.kind]} className="text-herb mt-0.5" />
                 <div className="min-w-0 flex-1">
-                  {note.message}
+                  <p dir="auto">{note.message}</p>
                   {preference && (
                     <span className="mt-2 flex flex-wrap gap-2">
                       <button
                         className="btn btn-primary"
                         onClick={() => void onChangeMemory(preference.id, "confirm")}
                       >
-                        {preference.removal_requested ? "Yes, remove it" : "Yes, remember"}
+                        {preference.removal_requested ? t.yesRemove : t.yesRemember}
                       </button>
                       <button
                         className="btn btn-quiet"
                         onClick={() => void onChangeMemory(preference.id, "dismiss")}
                       >
-                        {preference.removal_requested ? "Keep it" : "No, forget it"}
+                        {preference.removal_requested ? t.keep : t.no}
                       </button>
                     </span>
                   )}
@@ -85,7 +87,11 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
         </ul>
       )}
 
-      {text && <p className="leading-relaxed">{text}</p>}
+      {text && (
+        <p dir="auto" className="leading-relaxed">
+          {text}
+        </p>
+      )}
 
       {/* One sheet holding the dishes, not a card for each. */}
       {dishes.length > 0 && (
@@ -112,7 +118,7 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
       )}
 
       {notice && (
-        <p className="text-alert flex gap-2 text-[13px] leading-relaxed">
+        <p dir="auto" className="text-alert flex gap-2 text-[13px] leading-relaxed">
           <Icon name="warning" className="mt-0.5" />
           {notice}
         </p>
@@ -120,8 +126,7 @@ export default function MessageView({ message, memory, dishActions, onChangeMemo
       {(engine === "fallback" || engine === "rules") && (
         <p className="text-muted flex gap-2 text-[13px]">
           <Icon name="info" className="mt-0.5" />
-          I read this message with basic phrase matching and may have missed something. Please check
-          “My preferences”, especially for allergies.
+          {t.basic}
         </p>
       )}
     </div>

@@ -8,7 +8,11 @@ from app.schemas import Candidate, MemoryNote, Preference
 
 
 def remember(
-    connection: Connection, user_id: str, candidates: list[Candidate], source_text: str
+    connection: Connection,
+    user_id: str,
+    candidates: list[Candidate],
+    source_text: str,
+    lang: str = "en",
 ) -> list[MemoryNote]:
     repository.lock_user(connection, user_id)
     notes: list[MemoryNote] = []
@@ -16,7 +20,7 @@ def remember(
     ordered = sorted(candidates, key=lambda c: c.operation != "retract")
     for candidate in ordered:
         for canonical in normalize(candidate):
-            decision = decide(canonical, repository.live_preferences(connection, user_id))
+            decision = decide(canonical, repository.live_preferences(connection, user_id), lang)
             created_id = None
             for change in decision.changes:
                 preference_id = repository.apply_change(connection, user_id, change, source_text)

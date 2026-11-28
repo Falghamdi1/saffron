@@ -71,6 +71,12 @@ a live check."
 
 Show Diner B's empty preference panel: accounts are isolated.
 
+## Optional: one memory, two languages (30 s)
+
+Only if rehearsed. Switch to العربية, start a new conversation and type
+`وش تنصحني للعشا؟`: the allergy saved in English still applies. Take the time from the
+challenge section.
+
 ## 6:20 The challenge and the implementation (2 min)
 
 Say why memory, and what was not chosen ([design-decisions.md](design-decisions.md)).
