@@ -6,6 +6,7 @@ hard constraint, so no score can outweigh an allergy, diet, budget or stock rule
 
 from dataclasses import dataclass, field
 
+from app.memory.policy import unidentified
 from app.schemas import Exclusion, MenuItem, Preference, Recommendation, RequestConstraints
 from app.vocabulary import (
     ALLERGEN_CLASSES,
@@ -93,7 +94,9 @@ def violations(item: MenuItem, profile: Profile) -> list[str]:
 
     allergies = profile.allergies | profile.unconfirmed_allergies
     for allergy in sorted(allergies):
-        if allergy in ALLERGENS:
+        if unidentified(allergy):
+            found.append("an allergy has not been identified")
+        elif allergy in ALLERGENS:
             if allergy in item.allergens:
                 found.append(f"contains {label(allergy)}")
             elif allergy in item.may_contain:

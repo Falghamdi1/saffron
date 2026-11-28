@@ -13,6 +13,10 @@ from app.schemas import Understanding
 
 INSTRUCTION = """You analyse one message from a restaurant customer and return JSON.
 Report only what this message says. Never guess facts about the customer.
+The message may be in English or Arabic, including Gulf dialect. Always write values and
+food words in English (for example sesame, peanut, chicken), whatever the language, and
+copy evidence verbatim in the original language and spelling. Note that "أبي" and "أبغى"
+mean "I want", not "my father".
 
 preferences: lasting facts about the customer themselves, never about other people.
 - category: allergy, diet, like, dislike, cuisine, spice or budget.

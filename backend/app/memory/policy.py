@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
+from app import language
 from app.schemas import Candidate, Certainty, MemoryNote, Preference, Status
 from app.vocabulary import (
     CUISINES,
@@ -66,9 +67,40 @@ def describe(category: str, value: str) -> str:
     }[category]
 
 
+def unidentified(value: str) -> bool:
+    """An allergy kept in the diner's own script, which no menu data can be checked against."""
+    return not value.isascii()
+
+
+def _from_arabic(category: str, value: str) -> list[str]:
+    """Arabic wording as the English terms the rest of the policy understands."""
+    folded = language.fold(value).strip()
+    if category == "allergy":
+        named = [a for group in language.find(folded, language.ALLERGENS) for a in group]
+        return named or language.find(folded, language.FOODS) or [value.strip()]
+    if category == "budget":
+        return [folded.replace("ريال", "").replace("ر.س", "").strip()]
+    if category in ("like", "dislike"):
+        foods = language.find(folded, language.FOODS)
+        if foods or category == "like":
+            return foods
+        return [a for group in language.find(folded, language.ALLERGENS) for a in group]
+    table = {"diet": language.DIETS, "spice": language.SPICE, "cuisine": language.CUISINES}
+    return [table[category][folded]] if folded in table.get(category, {}) else []
+
+
 def normalize(candidate: Candidate) -> list[Candidate]:
     """Map a candidate onto canonical values. Unusable candidates yield []."""
     category = candidate.category
+    if category != "favorite_dish" and language.is_arabic(candidate.value):
+        results = []
+        for term in dict.fromkeys(_from_arabic(category, candidate.value)):
+            changed = candidate.model_copy(update={"value": term})
+            if category == "allergy" and unidentified(term):
+                results.append(changed)
+            elif not language.is_arabic(term):
+                results += normalize(changed)
+        return results
     raw = " ".join(candidate.value.lower().replace("-", " ").split())
     if category == "allergy":
         values = allergens_for(raw) or (singular(raw),)
@@ -158,6 +190,22 @@ def _assert(candidate: Candidate, match: Preference | None, live: list[Preferenc
                 "update", "reinforced", "You mentioned it again",
                 category, value, match.id,
             ))
+        return decision
+
+    if category == "allergy" and unidentified(value):
+        # Never filter on something that cannot be checked: keep it and ask.
+        if match is None:
+            decision.changes.append(Change(
+                "create", "proposed", "The allergen could not be identified",
+                category, value, status="pending", certainty="inferred",
+            ))
+        decision.notes.append(MemoryNote(
+            kind="conflict",
+            message=(
+                f"I couldn't tell which allergen “{value}” is, so I won't suggest dishes yet. "
+                "Choose it under My preferences with “Add an allergy”, then dismiss this one."
+            ),
+        ))
         return decision
 
     if not explicit:

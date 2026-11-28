@@ -1,0 +1,176 @@
+"""Arabic input must reach the same structured memory and safety rules as English."""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.chat import context
+from app.main import create_app
+from app.memory.policy import normalize
+from app.schemas import Candidate, Understanding
+from app.setup_db import load_menu_file
+from app.understanding.rules import understand as rules
+from app.understanding.service import understand
+from evaluation.harness import Diner, Limits, picks, violations_by_oracle
+
+MENU = {item.id: item for item in load_menu_file()}
+
+
+class Model:
+    name = "scripted"
+
+    def __init__(self, result: Understanding) -> None:
+        self.result = result
+
+    def understand(self, message):
+        return self.result.model_copy(deep=True)
+
+
+def saved(result: Understanding) -> set[tuple[str, str, str]]:
+    return {
+        (c.category, c.value, c.operation)
+        for candidate in result.preferences if candidate.scope == "persistent"
+        for c in normalize(candidate)
+    }
+
+
+def table(result: Understanding) -> list[str]:
+    return context.clean(result.request).allergies
+
+
+@pytest.mark.parametrize(("word", "expected"), [
+    ("السمسم", {"sesame"}), ("سمسم", {"sesame"}), ("الطحينة", {"sesame"}),
+    ("المكسرات", {"peanut", "tree_nut"}), ("للمكسرات", {"peanut", "tree_nut"}),
+    ("الفول السوداني", {"peanut"}), ("اللوز", {"tree_nut"}), ("الحليب", {"milk"}),
+    ("منتجات الألبان", {"milk"}), ("البيض", {"egg"}), ("السمك", {"fish"}),
+    ("الروبيان", {"crustacean"}), ("الجمبري", {"crustacean"}), ("القمح", {"gluten"}),
+    ("الخردل", {"mustard"}),
+])
+def test_arabic_allergen_words_reach_the_same_canonical_values(word, expected):
+    got = {c.value for c in normalize(Candidate(category="allergy", value=word))}
+    assert got == expected
+
+
+@pytest.mark.parametrize(("message", "expected"), [
+    ("عندي حساسية من السمسم", {("allergy", "sesame", "assert")}),
+    ("أنا أتحسس من البيض والسمك", {("allergy", "egg", "assert"), ("allergy", "fish", "assert")}),
+    ("عندي حساسية من السمسم، وش تنصحني للعشا؟", {("allergy", "sesame", "assert")}),
+    ("ما عندي حساسية من السمسم", {("allergy", "sesame", "retract")}),
+    ("أنا نباتي", {("diet", "vegetarian", "assert")}),
+    ("ما عدت نباتي", {("diet", "vegetarian", "retract")}),
+    ("أحب الأكل الحار", {("spice", "hot", "assert")}),
+    ("ما أحب الأكل الحار", {("spice", "none", "assert")}),
+    ("أحب الدجاج", {("like", "chicken", "assert")}),
+    ("ما أحب الفطر", {("dislike", "mushroom", "assert")}),
+    ("ميزانيتي ٦٠ ريال", {("budget", "60", "assert")}),
+])
+def test_rules_read_clear_arabic_statements(message, expected):
+    assert saved(rules(message)) == expected
+
+
+def test_a_price_limit_with_arabic_digits():
+    assert rules("أبي شي أقل من ٤٥ ريال").request.max_price == 45
+
+
+def test_wanting_something_is_not_a_statement_about_my_father():
+    result = rules("أبي شي حار")
+    assert result.request.spice == 3
+    assert saved(result) == set()
+    assert table(result) == []
+    assert saved(rules("أبي أقول إن عندي حساسية من السمسم")) == {("allergy", "sesame", "assert")}
+
+
+@pytest.mark.parametrize("message", [
+    "زوجتي عندها حساسية من السمسم، وش تنصحني لها؟",
+    "ولدي عنده حساسية من السمسم",
+    "هل الحمص مناسب لشخص عنده حساسية من السمسم؟",
+])
+def test_another_diners_allergy_in_arabic_is_for_the_chat_only(message):
+    result = rules(message)
+    assert saved(result) == set()
+    assert table(result) == ["sesame"]
+
+
+def test_an_allergy_shared_in_arabic_is_remembered():
+    result = rules("أنا وزوجتي عندنا حساسية من السمسم")
+    assert ("allergy", "sesame", "assert") in saved(result)
+
+
+def test_a_hedged_arabic_allergy_stays_uncertain():
+    candidate = rules("أظن عندي حساسية من السمسم").preferences[0]
+    assert candidate.certainty == "uncertain"
+
+
+def test_a_model_cannot_save_another_persons_allergy_from_arabic():
+    message = "ولدي عنده حساسية من الفول السوداني"
+    wrong = Understanding(preferences=[
+        Candidate(category="allergy", value="peanut", evidence="حساسية من الفول السوداني")
+    ])
+    result, _ = understand(message, Model(wrong))
+    assert result.preferences == []
+    assert table(result) == ["peanut"]
+
+
+def test_a_quote_that_differs_only_in_spelling_marks_is_still_evidence():
+    message = "أنا أحبّ الدجاجَ"
+    model = Understanding(preferences=[
+        Candidate(category="like", value="chicken", evidence="انا احب الدجاج")
+    ])
+    result, _ = understand(message, Model(model))
+    assert saved(result) == {("like", "chicken", "assert")}
+
+
+def test_an_arabic_value_from_the_model_filters_the_menu(settings):
+    model = Understanding(intent="recommend", preferences=[
+        Candidate(category="allergy", value="السمسم", evidence="حساسية من السمسم")
+    ])
+    with TestClient(create_app(settings, provider=Model(model))) as client:
+        diner = Diner(client)
+        reply = diner.say("عندي حساسية من السمسم")
+        assert diner.preferences() == {("allergy", "sesame")}
+        assert picks(reply)
+        for item in picks(reply):
+            assert violations_by_oracle(item, Limits(allergens=("sesame",))) == []
+
+
+def test_an_allergy_that_cannot_be_identified_withholds_suggestions(diner):
+    reply = diner.say("عندي حساسية من الترمس. وش تنصحني؟")
+    assert picks(reply) == []
+    assert diner.preferences() == set()
+    assert diner.preferences("pending") == {("allergy", "الترمس")}
+    assert picks(diner.say("recommend a main")) == []
+
+
+def test_memory_is_shared_between_arabic_and_english(diner):
+    diner.say("عندي حساسية من السمسم وأحب الأكل الحار")
+    diner.new_conversation()
+    reply = diner.say("recommend a main")
+    assert diner.preferences() == {("allergy", "sesame"), ("spice", "hot")}
+    assert MENU[picks(reply)[0]].spice_level == 3
+    for item in picks(reply):
+        assert violations_by_oracle(item, Limits(allergens=("sesame",))) == []
+
+
+def test_memory_stated_in_english_applies_to_an_arabic_conversation(diner):
+    diner.say("I'm allergic to sesame")
+    diner.new_conversation()
+    reply = diner.say("وش تنصحني للعشا؟")
+    assert picks(reply)
+    for item in picks(reply):
+        assert violations_by_oracle(item, Limits(allergens=("sesame",))) == []
+    assert diner.preferences() == {("allergy", "sesame")}
+
+
+def test_saying_the_same_thing_in_both_languages_keeps_one_record(diner):
+    diner.say("I love chicken")
+    diner.say("أحب الدجاج")
+    assert [p["value"] for p in diner.memory()["preferences"]] == ["chicken"]
+
+
+@pytest.mark.parametrize("message", [
+    "ابي حلى بدون مكسرات", "عطني حلى ما فيه مكسرات", "ابي حلى من غير مكسرات",
+])
+def test_asking_for_something_without_a_food_never_asks_for_it(message):
+    request = rules(message).request
+    assert request.wants == []
+    assert request.avoid == ["nut"]
+    assert request.category == "dessert"

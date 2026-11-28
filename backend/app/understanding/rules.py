@@ -6,7 +6,9 @@ always used alongside the model as a safety net for allergy statements.
 
 import re
 
+from app import language
 from app.schemas import Candidate, RequestConstraints, Understanding
+from app.understanding import arabic
 from app.vocabulary import ALLERGEN_SYNONYMS, CUISINES, INGREDIENT_GROUPS, singular
 
 FOODS = {
@@ -84,12 +86,17 @@ def about_someone_else(clause: str) -> bool:
 
 def clause_is_about_someone_else(message: str, quote: str) -> bool:
     """Judge a quoted fragment by the whole clause it came from."""
-    quote = " ".join(quote.lower().replace("’", "'").split()).strip(" .,!?;")
+    in_arabic = language.is_arabic(quote)
+    split, judge = (
+        (arabic.clauses, arabic.about_someone_else) if in_arabic
+        else (clauses, about_someone_else)
+    )
+    quote = " ".join(language.fold(quote).split()).strip(" .,!?;")
     holding = [
-        c for c in clauses(message)
+        c for c in split(message)
         if quote in " ".join(c.split()) or " ".join(c.split()) in quote
     ]
-    return all(about_someone_else(c) for c in holding or [quote])
+    return all(judge(c) for c in holding or [quote])
 
 
 def _items(fragment: str) -> list[str]:
@@ -408,6 +415,21 @@ def _intent(text: str, out: _Extraction) -> str:
     return "other"
 
 
+def _add_arabic(message: str, out: _Extraction) -> str:
+    """Merge what the Arabic patterns found. Returns the intent of the message."""
+    found = arabic.read(message)
+    out.preferences += found.preferences
+    request, extra = out.request, found.request
+    request.allergies += extra.allergies
+    request.wants += extra.wants
+    request.avoid += extra.avoid
+    request.category = request.category or extra.category
+    request.max_price = request.max_price or extra.max_price
+    request.spice = extra.spice if request.spice is None else request.spice
+    request.cheaper = request.cheaper or extra.cheaper
+    return found.intent
+
+
 def understand(message: str) -> Understanding:
     out = _Extraction()
     for clause in clauses(message):
@@ -422,6 +444,8 @@ def understand(message: str) -> Understanding:
 
     text = message.lower().replace("’", "'")
     intent = _intent(text, out)
+    if language.is_arabic(message):
+        intent = _add_arabic(message, out)
     out.request.wants = [
         w for w in dict.fromkeys(out.request.wants) if w not in out.request.avoid
     ]

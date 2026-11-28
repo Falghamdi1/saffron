@@ -8,16 +8,24 @@ if it fails.
 import logging
 import re
 
+from app import language
 from app.memory.policy import normalize
 from app.schemas import Candidate, Understanding
-from app.understanding import rules
+from app.understanding import arabic, rules
 from app.understanding.llm import LLMError, UnderstandingProvider
 
 logger = logging.getLogger(__name__)
 
 # What a message has to mention before a diet can be set aside for the conversation.
-MEAT_TOPICS = r"vegetarian|veggie|vegan|pescatarian|\b(?:meat|chicken|lamb|beef|fish|prawns?)\b"
-DIET_TOPICS = {"gluten_free": r"gluten", "dairy_free": r"dairy|lactose|milk|cheese"}
+# Arabic is written in its folded spelling.
+MEAT_TOPICS = (
+    r"vegetarian|veggie|vegan|pescatarian|\b(?:meat|chicken|lamb|beef|fish|prawns?)\b"
+    r"|نباتي|لحم|دجاج|سمك|روبيان"
+)
+DIET_TOPICS = {
+    "gluten_free": r"gluten|جلوتين|غلوتين",
+    "dairy_free": r"dairy|lactose|milk|cheese|البان|حليب|جبن",
+}
 
 
 def understand(message: str, provider: UnderstandingProvider | None) -> tuple[Understanding, str]:
@@ -38,7 +46,8 @@ def understand(message: str, provider: UnderstandingProvider | None) -> tuple[Un
 
 
 def _squash(text: str) -> str:
-    return " ".join(text.lower().replace("’", "'").split())
+    """Comparable form of a message or a quote from it, in either language."""
+    return " ".join(language.fold(text).split())
 
 
 def _keys(candidate: Candidate) -> set[tuple[str, str]]:
@@ -65,7 +74,10 @@ def _reconcile(message: str, model: Understanding, baseline: Understanding) -> U
     # The model tends to read "I don't eat much meat" as a firm dislike.
     for candidate in preferences:
         wording = _squash(candidate.evidence)
-        hedging = rules.HEDGE.search(wording) or rules.SOFTENED.search(wording)
+        hedging = (
+            rules.HEDGE.search(wording) or rules.SOFTENED.search(wording)
+            or arabic.HEDGE.search(wording)
+        )
         if candidate.category != "allergy" and hedging:
             candidate.certainty = "uncertain"
 
